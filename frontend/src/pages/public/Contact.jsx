@@ -1,0 +1,127 @@
+import { Mail, MapPin, Phone, Star } from 'lucide-react'
+import { useLookups } from '../../context/LookupContext.jsx'
+import { Breadcrumb, Callout, Panel } from '../../components/ui/Blocks.jsx'
+import { Button } from '../../components/ui/Button.jsx'
+import EnquiryForm from '../../components/properties/EnquiryForm.jsx'
+import { Skeleton } from '../../components/ui/Feedback.jsx'
+
+export default function Contact() {
+  const { company } = useLookups()
+
+  return (
+    <div>
+      <section className="section-tight" style={{ padding: '40px 0 12px' }}>
+        <div className="container stack">
+          <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'Contact' }]} />
+          <p className="eyebrow">Contact</p>
+          <h1>Talk to the property desk</h1>
+          <p className="lead" style={{ maxWidth: '72ch' }}>
+            Enquiries about a listing, a property you want managed, an arrears instruction or works on a building all
+            come to the same team. Use the form and we will reply by email or phone.
+          </p>
+        </div>
+      </section>
+
+      <section className="section-tight">
+        <div className="container">
+          <div className="split">
+            <Panel title="Send an enquiry">
+              <EnquiryForm
+                title="Your message"
+                defaultSubject="General enquiry"
+                note="This form is logged in the enquiry inbox. It does not reserve a property or book a viewing."
+              />
+            </Panel>
+
+            <aside className="sticky-side stack">
+              <Panel title="Mant Bridges LTD">
+                <div className="stack">
+                  {company ? (
+                    <>
+                      <div className="feature">
+                        <span className="icon-tile">
+                          <Mail size={18} />
+                        </span>
+                        <div>
+                          <p className="bold" style={{ margin: 0 }}>Email</p>
+                          <a href={`mailto:${company.email}`}>{company.email}</a>
+                        </div>
+                      </div>
+                      <div className="feature">
+                        <span className="icon-tile">
+                          <Phone size={18} />
+                        </span>
+                        <div>
+                          <p className="bold" style={{ margin: 0 }}>Phone</p>
+                          <a href={`tel:${company.phone.replace(/\s/g, '')}`}>{company.phone || 'Not published'}</a>
+                          {company.alt_phone ? (
+                            <>
+                              <br />
+                              <a href={`tel:${company.alt_phone.replace(/\s/g, '')}`}>{company.alt_phone}</a>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="feature">
+                        <span className="icon-tile">
+                          <MapPin size={18} />
+                        </span>
+                        <div>
+                          <p className="bold" style={{ margin: 0 }}>Office</p>
+                          <p className="muted" style={{ margin: 0 }}>
+                            {[company.address, company.city, company.country].filter(Boolean).join(', ')}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Skeleton height={54} />
+                      <Skeleton height={54} />
+                    </>
+                  )}
+                </div>
+              </Panel>
+
+              {company?.payment_instructions ? (
+                <Panel title="Payment instructions">
+                  <div className="stack stack-sm">
+                    <p className="muted" style={{ margin: 0 }}>
+                      {company.payment_instructions}
+                    </p>
+                    {company.bank_name ? (
+                      <p className="hint" style={{ margin: 0 }}>
+                        Bank: {company.bank_name}
+                        {company.bank_branch ? ` — ${company.bank_branch}` : ''}
+                        <br />
+                        Account name: {company.bank_account_name}
+                        <br />
+                        Account: {company.bank_account_number}
+                      </p>
+                    ) : null}
+                    {company.mobile_money_number ? (
+                      <p className="hint" style={{ margin: 0 }}>
+                        Mobile money: {company.mobile_money_number}
+                      </p>
+                    ) : null}
+                  </div>
+                </Panel>
+              ) : null}
+
+              <Callout>
+                <Star size={17} />
+                <span>
+                  Already have an account?{' '}
+                  <Button to="/login" variant="link" size="sm">
+                    Sign in
+                  </Button>{' '}
+                  to see your invoices, record a payment or message the team directly.
+                </span>
+              </Callout>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}

@@ -1,0 +1,23 @@
+{
+  "name": "mant-bridges-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Mant Bridges LTD - property listings, blog and rent management dashboard.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "lucide-react": "^1.57.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.2",
+    "vite": "^5.4.8"
+  }
+}
