@@ -30,6 +30,18 @@ const TONES = {
   PUBLISHED: 'ok',
   OPEN: 'info',
   CLOSED: 'outline',
+  // newsletter + campaigns
+  SUBSCRIBED: 'ok',
+  PENDING_CONFIRMATION: 'warn',
+  UNSUBSCRIBED: 'outline',
+  SUPPRESSED: 'bad',
+  BOUNCED: 'bad',
+  QUEUED: 'info',
+  SENDING: 'warn',
+  COMPLETED: 'ok',
+  ACCEPTED: 'ok',
+  FAILED: 'bad',
+  SKIPPED: 'outline',
   // misc
   TRUE: 'ok',
 };

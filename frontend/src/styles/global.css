@@ -2679,3 +2679,22 @@ hr {
     align-items: stretch;
   }
 }
+
+/* ---------- Email campaigns ---------------------------------------------- */
+
+/* The preview is the real HTML email document in a sandboxed iframe: the 600px
+   table and its inline styles are exactly what the recipient receives. */
+.email-preview {
+  display: block;
+  width: 100%;
+  height: 460px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f4f6f9;
+}
+
+@media (max-width: 720px) {
+  .email-preview {
+    height: 360px;
+  }
+}

@@ -37,6 +37,8 @@ import ManagePosts from './pages/manage/ManagePosts.jsx'
 import PostForm from './pages/manage/PostForm.jsx'
 import ManageCategories from './pages/manage/ManageCategories.jsx'
 import CompanySettings from './pages/manage/CompanySettings.jsx'
+import EmailCampaigns from './pages/manage/EmailCampaigns.jsx'
+import EmailSubscribers from './pages/manage/EmailSubscribers.jsx'
 
 import TenantDashboard from './pages/portal/Dashboard.jsx'
 import TenantLeases from './pages/portal/Leases.jsx'
@@ -97,6 +99,8 @@ export default function App() {
               <Route path="manage/posts/new" element={<PostForm />} />
               <Route path="manage/posts/:id/edit" element={<PostForm />} />
               <Route path="manage/categories" element={<ManageCategories />} />
+              <Route path="manage/email/campaigns" element={<EmailCampaigns />} />
+              <Route path="manage/email/subscribers" element={<EmailSubscribers />} />
               <Route path="manage/company" element={<CompanySettings />} />
             </Route>
           </Route>

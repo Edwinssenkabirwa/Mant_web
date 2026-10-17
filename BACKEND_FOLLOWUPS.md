@@ -160,6 +160,11 @@ stay idempotent — a double run would double-charge a tenant. Also decide wheth
 raise reminder messages automatically for newly overdue invoices; today reminders are a manual,
 auditable action, which is defensible but should be a choice rather than an accident.
 
+`python manage.py send_email_campaign --limit 200` belongs on the same scheduler, every few minutes
+rather than nightly — a queued campaign should not sit until tomorrow. It claims campaigns atomically
+and resumes where the last run stopped, so an overlapping or repeated run is harmless; see item 16
+for what still wants a real queue instead.
+
 ## 12. Split company settings by owner (low)
 
 **Current state:** `PATCH /api/company/` is admin-only, and `GET /api/company/` is public and
@@ -202,31 +207,45 @@ plus a `Notification` model if in-app bell behaviour is wanted. The newsletter e
 
 ---
 
-## 16. Email campaigns, blog distribution and delivery truth (high, next)
+## 16. Email delivery truth, distribution and preferences (high, next)
 
-**Current state:** only the newsletter confirmation email exists. `NewsletterSubscription` records
-who may be mailed, and `NewsletterSubscription.objects.subscribed()` is the eligible audience, but
-there is no campaign model, no admin subscriber screen, no queue and no provider feedback loop.
-Nothing has ever been delivered for real: `EMAIL_BACKEND` is the console backend in development.
+**Built now:** `EmailCampaign` + `EmailCampaignRecipient` (migration `core.0004`),
+`apps/core/services/campaigns.py`, `manage.py send_email_campaign`, the HTML/text templates under
+`apps/core/templates/email/`, the admin API at `/api/manage/email/{subscribers,campaigns}/` and the
+two screens at `/manage/email/{campaigns,subscribers}`. Audiences resolve server-side, deduplicate by
+normalised address, and suppression beats every other table at queue time *and* again at send time.
+Bulk mail no longer happens inside a request: HTTP freezes the audience, the command sends it in
+slices and re-claims idempotently. Recipient statuses stop at `ACCEPTED`, never "delivered".
 
-**Needed before any bulk mail:**
+**Still missing:**
 
-1. `EmailCampaign` + `EmailCampaignRecipient` and an admin UI at `/manage/email/subscribers` and
-   `/manage/email/campaigns`. Recipient eligibility must be resolved server-side, deduplicated by
-   normalised address, and never allowed to override `SUPPRESSED`/`BOUNCED`.
-2. A queue and worker (Django-Q2/Celery, or `manage.py` + cron for a start). One confirmation email
-   inside a request is fine; a campaign is not. Bounded retries with backoff, and provider rate limits
-   respected.
-3. Delivery records fed by provider webhooks, verified by signature and applied idempotently. Until
-   then the honest vocabulary is *accepted by provider*, *failed* and *bounced* — "delivered" must not
-   be shown, because nothing proves the message reached an inbox.
-4. Suppression on hard bounce and complaint, and a preferences page that keeps essential operational
-   mail outside the marketing opt-out.
+1. **A real queue.** `send_email_campaign` from cron is the stopgap — good enough for a few thousand
+   messages, wrong for a list that grows: no provider rate limiting, no per-provider concurrency, and
+   a run that dies mid-slice must be restarted by the schedule. Move the same
+   `deliver_campaign(campaign, limit=…)` slice behind Celery/Django-Q2 and keep the command as the
+   manual override.
+2. **Provider webhooks for bounce, complaint and delivery.** Verify the signature, apply idempotently
+   by message/recipient id, then flip `NewsletterSubscription` to `BOUNCED` on a hard bounce and add a
+   `COMPLAINED` status so a complaint suppresses the address everywhere. Until then the vocabulary
+   stops at *accepted by provider* — that is deliberate, not a gap to paper over.
+3. **Blog-to-newsletter distribution.** Publish → campaign is still manual. Needs a `Post` signal or a
+   `distribute_post` command that builds a campaign from the post body, uses the canonical public URL
+   (`PUBLIC_SITE_URL` + slug), and respects the same audience/suppression resolution.
+4. **Transactional alerts for real events.** Overdue invoice, payment recorded but unconfirmed, new
+   enquiry, unread message — currently none of these email anybody. Reuse
+   `apps/core/services/campaigns.py`'s template + unsubscribe conventions, but keep operational mail
+   outside the marketing opt-out.
+5. **A preferences page** (`/account/email-preferences`) so a person controls their own consent:
+   `User.marketing_opt_in` is set in `/django-admin/` today, which is only honest while staff act on
+   a request the user made. Include the immediate unsubscribe URL and a per-audience toggle.
+6. **Rate limiting at the provider boundary** — per-hour send cap, and a kill switch that pauses a
+   campaign without cancelling it.
 
 **Production email setup:** a transactional provider with a verified sender on a domain that has
 SPF, DKIM and DMARC records; `DEFAULT_FROM_EMAIL`, `PUBLIC_SITE_URL` and the `EMAIL_*` variables in
 `backend/.env`. Do not claim real delivery until a message has been received at Gmail, Yahoo and
-Outlook addresses from that configuration.
+Outlook addresses from that configuration. `/api/manage/email/campaigns/stats/` reports the live
+backend so the UI can say so plainly until then.
 
 ---
 

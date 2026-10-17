@@ -1,0 +1,15 @@
+{% autoescape off %}{{ subject }}
+
+{% if first_name %}Hi {{ first_name }},{% else %}Hi there,{% endif %}
+
+{% for paragraph in paragraphs %}{{ paragraph }}
+
+{% endfor %}
+
+--
+{{ company_name }}
+{% if address_line %}{{ address_line }}
+{% endif %}{{ site_url }}
+
+You are receiving this because {{ company_name }} has permission to email you.
+Unsubscribe: {{ unsubscribe_url }}{% endautoescape %}

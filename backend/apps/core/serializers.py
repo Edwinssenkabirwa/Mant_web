@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.core.helpers import absolute_media_url
-from apps.core.models import Company, Service
+from apps.core.models import Company, EmailCampaign, EmailCampaignRecipient, NewsletterSubscription, Service
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -131,3 +131,119 @@ class NewsletterTokenSerializer(serializers.Serializer):
         if not cleaned:
             raise serializers.ValidationError("This link is missing its token.")
         return cleaned
+
+
+class NewsletterSubscriberSerializer(serializers.ModelSerializer):
+    """Administrator view of the mailing list.
+
+    Status transitions stay with the double opt-in service, so only ``notes`` is writable
+    here; token hashes are not in ``fields`` and therefore never leave the API.
+    """
+
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    receives_mail = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = NewsletterSubscription
+        fields = [
+            "id", "email", "first_name", "status", "status_display", "source",
+            "receives_mail", "consent_given_at", "confirmed_at", "unsubscribed_at",
+            "notes", "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "email", "first_name", "status", "status_display", "source",
+            "receives_mail", "consent_given_at", "confirmed_at", "unsubscribed_at",
+            "created_at", "updated_at",
+        ]
+
+    def validate_notes(self, value):
+        return (value or "").strip()[:255]
+
+
+class EmailCampaignRecipientSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    source_display = serializers.CharField(source="get_source_display", read_only=True)
+
+    class Meta:
+        model = EmailCampaignRecipient
+        fields = [
+            "id", "email", "display_name", "source", "source_display",
+            "status", "status_display", "attempts", "error", "sent_at",
+        ]
+        read_only_fields = fields
+
+
+class EmailCampaignSerializer(serializers.ModelSerializer):
+    """Campaign draft editing. Everything measured lives on the server."""
+
+    audiences = serializers.ListField(
+        child=serializers.ChoiceField(choices=EmailCampaign.Audience.choices),
+        allow_empty=False,
+        max_length=len(EmailCampaign.Audience.choices),
+    )
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    is_editable = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = EmailCampaign
+        fields = [
+            "id", "name", "subject", "body", "audiences",
+            "status", "status_display", "is_editable",
+            "recipient_count", "excluded_count", "accepted_count",
+            "failed_count", "skipped_count",
+            "created_by_name", "queued_at", "started_at", "completed_at",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "status", "status_display", "is_editable", "recipient_count",
+            "excluded_count", "accepted_count", "failed_count", "skipped_count",
+            "created_by_name", "queued_at", "started_at", "completed_at",
+            "created_at", "updated_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.full_name if obj.created_by else ""
+
+    def validate_name(self, value):
+        cleaned = (value or "").strip()
+        if len(cleaned) < 3:
+            raise serializers.ValidationError("Give the campaign a name to recognise it by.")
+        return cleaned[:120]
+
+    def validate_subject(self, value):
+        cleaned = (value or "").strip()
+        if len(cleaned) < 4:
+            raise serializers.ValidationError("Write a subject line.")
+        return cleaned[:200]
+
+    def validate_body(self, value):
+        cleaned = (value or "").strip()
+        if len(cleaned) < 10:
+            raise serializers.ValidationError("The message needs some content.")
+        return cleaned
+
+    def validate(self, attrs):
+        if self.instance is not None and not self.instance.is_editable:
+            raise serializers.ValidationError(
+                "Only a draft can be edited. This campaign is "
+                f"{self.instance.get_status_display().lower()}."
+            )
+        return attrs
+
+
+class AudienceEstimateSerializer(serializers.Serializer):
+    """Body of the audience-count request raised from the compose screen."""
+
+    audiences = serializers.ListField(
+        child=serializers.ChoiceField(choices=EmailCampaign.Audience.choices),
+        allow_empty=False,
+        max_length=len(EmailCampaign.Audience.choices),
+    )
+
+
+class CampaignTestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+    def validate_email(self, value):
+        return value.strip().lower()

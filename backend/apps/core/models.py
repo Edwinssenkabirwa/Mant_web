@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from apps.core.helpers import unique_slug
@@ -229,3 +230,94 @@ class NewsletterSubscription(TimeStampedModel):
     @property
     def receives_mail(self):
         return self.status == self.Status.SUBSCRIBED
+
+
+class EmailCampaign(TimeStampedModel):
+    """One message, one audience, sent in batches by ``send_email_campaign``.
+
+    Counts are written by the sender, never by the browser: the admin sees how many
+    addresses were eligible, how many the mail server accepted, and nothing claims a
+    message reached an inbox.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        QUEUED = "QUEUED", "Queued for sending"
+        SENDING = "SENDING", "Sending"
+        COMPLETED = "COMPLETED", "Completed"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    class Audience(models.TextChoices):
+        NEWSLETTER_SUBSCRIBERS = "NEWSLETTER_SUBSCRIBERS", "Confirmed newsletter subscribers"
+        OPTED_IN_USERS = "OPTED_IN_USERS", "Registered users who opted in"
+        LANDLORDS = "LANDLORDS", "Landlords who opted in"
+        TENANTS = "TENANTS", "Tenants who opted in"
+
+    name = models.CharField(max_length=120, help_text="Internal label, never emailed.")
+    subject = models.CharField(max_length=200)
+    body = models.TextField(blank=True, default="", help_text="Plain text; blank lines start a new paragraph.")
+    audiences = models.JSONField(default=list, blank=True)
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.DRAFT, db_index=True
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="email_campaigns",
+    )
+    queued_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    recipient_count = models.PositiveIntegerField(default=0)
+    excluded_count = models.PositiveIntegerField(default=0)
+    accepted_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Email campaign"
+        verbose_name_plural = "Email campaigns"
+
+    def __str__(self):
+        return f"{self.name} ({self.status})"
+
+    @property
+    def is_editable(self):
+        return self.status == self.Status.DRAFT
+
+
+class EmailCampaignRecipient(models.Model):
+    """One address inside one campaign. ``ACCEPTED`` means the mail server took it."""
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Waiting to send"
+        ACCEPTED = "ACCEPTED", "Accepted by the mail server"
+        FAILED = "FAILED", "Failed after retries"
+        SKIPPED = "SKIPPED", "Skipped (no longer eligible)"
+
+    class Source(models.TextChoices):
+        SUBSCRIBER = "SUBSCRIBER", "Newsletter subscriber"
+        USER = "USER", "Registered user"
+
+    campaign = models.ForeignKey(EmailCampaign, on_delete=models.CASCADE, related_name="recipients")
+    email = models.EmailField(max_length=254, db_index=True)
+    display_name = models.CharField(max_length=150, blank=True, default="")
+    source = models.CharField(max_length=12, choices=Source.choices, default=Source.SUBSCRIBER)
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    attempts = models.PositiveIntegerField(default=0)
+    error = models.CharField(max_length=255, blank=True, default="")
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("id",)
+        constraints = [
+            models.UniqueConstraint(fields=["campaign", "email"], name="unique_campaign_recipient")
+        ]
+        verbose_name = "Email campaign recipient"
+        verbose_name_plural = "Email campaign recipients"
+
+    def __str__(self):
+        return f"{self.email} → {self.campaign_id} ({self.status})"

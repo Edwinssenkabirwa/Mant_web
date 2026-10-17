@@ -5,7 +5,9 @@ from apps.core.views import (
     CompanyAPIView,
     HealthAPIView,
     LookupsAPIView,
+    ManageCampaignViewSet,
     ManageServiceViewSet,
+    ManageSubscriberViewSet,
     NewsletterConfirmView,
     NewsletterSubscribeView,
     NewsletterUnsubscribeView,
@@ -17,6 +19,12 @@ public_router.register("services", PublicServiceViewSet, basename="service")
 
 manage_router = DefaultRouter()
 manage_router.register("manage/services", ManageServiceViewSet, basename="manage-service")
+manage_router.register(
+    "manage/email/subscribers", ManageSubscriberViewSet, basename="manage-subscriber"
+)
+manage_router.register(
+    "manage/email/campaigns", ManageCampaignViewSet, basename="manage-campaign"
+)
 
 urlpatterns = [
     path("company/", CompanyAPIView.as_view(), name="company"),

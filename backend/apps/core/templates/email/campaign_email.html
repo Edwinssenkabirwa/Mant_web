@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ subject }}</title>
+  </head>
+  <body style="margin:0; padding:0; background:#f4f6f9; font-family:Georgia, 'Times New Roman', serif; color:#0b2545;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9; padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background:#ffffff; border-top:4px solid #e8475c;">
+            <tr>
+              <td style="background:#0b2545; padding:24px 28px;">
+                <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#ffb3bd;">
+                  {{ company_name }}
+                </p>
+                <h1 style="margin:10px 0 0; font-size:22px; line-height:1.3; color:#ffffff;">
+                  {{ subject }}
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <p style="margin:0 0 16px; font-size:16px; line-height:1.6;">
+                  {% if first_name %}Hi {{ first_name }},{% else %}Hi there,{% endif %}
+                </p>
+                {% for paragraph in paragraphs %}
+                <p style="margin:0 0 16px; font-size:16px; line-height:1.7;">{{ paragraph|linebreaksbr }}</p>
+                {% endfor %}
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 0;">
+                  <tr>
+                    <td style="border-top:1px solid #dfe6ef; width:100%;"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 28px; background:#f7f9fc; border-top:1px solid #dfe6ef; font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:1.7; color:#5a6b7d;">
+                <p style="margin:0 0 6px;">
+                  &copy; {{ company_name }}{% if address_line %}, {{ address_line }}{% endif %}
+                </p>
+                {% if company.email %}
+                <p style="margin:0 0 6px;">
+                  {{ company.email }}{% if company.phone %} &middot; {{ company.phone }}{% endif %}
+                </p>
+                {% endif %}
+                <p style="margin:0;">
+                  You are receiving this because {{ company_name }} has permission to email you.
+                </p>
+                <p style="margin:6px 0 0;">
+                  <a href="{{ site_url }}" style="color:#0b2545;">Visit the site</a>
+                  &middot;
+                  <a href="{{ unsubscribe_url }}" style="color:#0b2545;">Unsubscribe</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

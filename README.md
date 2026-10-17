@@ -99,18 +99,24 @@ Media is portable by design: the API returns `request.build_absolute_uri()` path
 
 ## Scheduled jobs
 
-Both exist and are idempotent, but nothing runs them yet — put them on cron / Task Scheduler
+All three exist and are idempotent, but nothing runs them yet — put them on cron / Task Scheduler
 (see `BACKEND_FOLLOWUPS.md`, item 11):
 
 ```bash
-python manage.py mark_overdue            # expire leases, flag overdue, apply late fees
-python manage.py generate_invoices       # bill active tenancies up to today
+python manage.py mark_overdue                       # expire leases, flag overdue, apply late fees
+python manage.py generate_invoices                  # bill active tenancies up to today
 python manage.py generate_invoices --months 1
+python manage.py send_email_campaign --limit 200     # walk queued campaigns, a slice per run
+python manage.py send_email_campaign --campaign 4 --passes 5 --delay 0.5
 ```
+
+`send_email_campaign` claims a queued campaign atomically, so a second run started while the first is
+still going reports that the campaign is held and does nothing. Re-running it resumes the same
+campaign where it stopped; each recipient gets at most 3 attempts before it is marked failed.
 
 ## API surface consumed by the frontend
 
-71 endpoints under `/api`. Groups the SPA uses daily:
+95 endpoints under `/api` (enumerated from the URLconf). Groups the SPA uses daily:
 
 - `GET /api/company/`, `/api/lookups/`, `/api/health/` — profile, vocabularies, liveness
 - `/api/properties/` (+`featured/`, `cities/`, `stats/`, `<slug>/`) — public catalogue, hidden
@@ -126,6 +132,11 @@ python manage.py generate_invoices --months 1
 - `/api/payments/` (+`summary/`, `{id}/{confirm,reject}/`), `/api/receipts/` (+`{id}/{download,void}/`)
 - `/api/statements/`, `/api/analytics/` — server-aggregated reporting
 - `/api/conversations/` (+`recipients/`, `unread-count/`, `{id}/{messages,mark-read,close}/`)
+- `/api/manage/email/subscribers/` (+`stats/`, `{id}/{suppress,reactivate}/`) — admin view of the
+  mailing list. Read and annotate only: no create, no `PUT`, no delete, and `notes` is the single
+  writable field. Token hashes are not serialized.
+- `/api/manage/email/campaigns/` (+`stats/`, `audience-count/`, `{id}/{preview,recipients,test,queue,cancel}/`)
+  — admin drafts. Nothing here sends a campaign; `queue/` only freezes the audience.
 
 Two conventions matter when extending the UI:
 
@@ -145,7 +156,8 @@ Complete and wired to real data:
 `/manage/properties` (+`new`, `:id/edit`) · `/manage/leases` (+`new`, `:id/edit`) ·
 `/manage/invoices` (+`:id`) · `/manage/payments` · `/manage/receipts` · `/manage/messages` ·
 `/manage/profile` · `/manage/password` · `/manage/users` · `/manage/enquiries` ·
-`/manage/posts` (+`new`, `:id/edit`) · `/manage/categories` · `/manage/company` ·
+`/manage/posts` (+`new`, `:id/edit`) · `/manage/categories` · `/manage/email/campaigns` ·
+`/manage/email/subscribers` · `/manage/company` ·
 `/portal` · `/portal/leases` · `/portal/statement` · `/portal/invoices` (+`:id`) ·
 `/portal/payments` · `/portal/receipts` · `/portal/messages` · `/portal/profile` ·
 `/portal/password`
@@ -163,9 +175,11 @@ Built but deliberately limited, because the backend does not support more:
   confirmation; the tenant portal shows the company's bank/mobile-money instructions.
 - Logout clears the browser session but cannot revoke the token server-side. (follow-up 2)
 
-## Newsletter (double opt-in)
+## Newsletter and campaigns
 
-Public sign-up is live; bulk campaigns are not (see `BACKEND_FOLLOWUPS.md`).
+Public sign-up is live, campaign drafts are live, and bulk sending is batched through a command.
+No provider is configured here, so no message has ever reached an inbox
+(see `BACKEND_FOLLOWUPS.md`, item 16).
 
 - Model `NewsletterSubscription` (`apps/core/models.py`, migration `core.0003`) keeps one row per
   normalised address with statuses `PENDING_CONFIRMATION`, `SUBSCRIBED`, `UNSUBSCRIBED`,
@@ -180,18 +194,41 @@ Public sign-up is live; bulk campaigns are not (see `BACKEND_FOLLOWUPS.md`).
   (`apps/core/throttles.py`).
 - A previous unsubscribe is only reversed by signing up again *and* clicking a fresh confirmation
   link. `SUPPRESSED` and `BOUNCED` addresses are never re-activated by the web form — an
-  administrator has to change them in `/django-admin/`, where the token hashes are not shown.
+  administrator has to start that from `/manage/email/subscribers` (or `/django-admin/`), and even
+  then the address stays pending until its owner clicks the new link. Token hashes are never
+  serialized out of either screen.
 - The subscribe box appears as a navy band on the homepage and as a card after the body of every
   article (`components/common/NewsletterSignup.jsx`); the emailed links land on
   `/newsletter/confirm` and `/newsletter/unsubscribe`, which post the token straight back to Django.
-- Nothing is sent to a subscriber today: only the confirmation email exists. Campaign sending,
-  blog-to-newsletter distribution and delivery reporting still need a queue and a provider.
+
+### Campaigns
+
+`EmailCampaign` + `EmailCampaignRecipient` (migration `core.0004`) and
+`apps/core/services/campaigns.py` are the whole sending path;
+`User.marketing_opt_in` / `marketing_opt_in_at` (migration `accounts.0002`) is the consent record
+for the three account audiences, and it is stamped and cleared in `/django-admin/` rather than by
+the person editing a campaign.
+
+- `/manage/email/campaigns` composes a draft, asks the server how many people the audience selection
+  actually reaches (`POST /api/manage/email/campaigns/audience-count/`), previews the rendered
+  message and can hand a `[TEST]` copy to the mail server. None of those calls mail the list.
+- Queueing resolves the audiences once, merges duplicate addresses, drops anything suppressed,
+  freezes the recipient rows and marks the campaign `QUEUED`. The draft stops being editable there.
+  The HTTP request never loops over recipients; `manage.py send_email_campaign` does, in slices.
+- Recipient statuses are `PENDING`, `ACCEPTED`, `FAILED` and `SKIPPED`. **`ACCEPTED` means the mail
+  server took the message** — this platform records no delivery, open or click events, because no
+  provider has confirmed any, so the UI says exactly that.
+- Campaign bodies are plain text split on blank lines; the branded header, greeting and
+  unsubscribe footer come from `apps/core/templates/email/campaign_email.{txt,html}`, with the HTML
+  side autoescaped.
+- Blog-to-newsletter distribution, per-user preferences and provider bounce/complaint webhooks are
+  still open — see `BACKEND_FOLLOWUPS.md` 16.
 
 **Before real sending works:** point `EMAIL_BACKEND` at an SMTP or transactional provider with
 verified credentials, set `DEFAULT_FROM_EMAIL` to an address on a domain with SPF, DKIM and DMARC
-records, set `PUBLIC_SITE_URL` to the public origin, and put bulk mail behind a queue — the
-confirmation email is sent inside the request, which is fine for one message and wrong for thousands.
-While `EMAIL_BACKEND` is the console backend nothing leaves the machine; the automated tests use the
+records, set `PUBLIC_SITE_URL` to the public origin, and schedule `send_email_campaign` (or replace
+it with a queue worker). While `EMAIL_BACKEND` is not `smtp.EmailBackend` the campaigns screen shows
+which backend is live and states that nothing can reach an inbox; the automated tests use the
 in-memory backend and assert on `mail.outbox`.
 
 ## Security notes (read before deploying)
@@ -214,9 +251,12 @@ in-memory backend and assert on `mail.outbox`.
 
 ## Verification status
 
-`npm run build` → `✓ 2082 modules transformed`, `dist/assets/index-*.js` ≈ 545 kB (gzip 155 kB),
-`✓ built in 4.0s`. `python manage.py check` → no issues. `python manage.py test` → 22 tests, OK
-(10 services, 12 newsletter).
+`npm run build` → `✓ 2085 modules transformed`, `dist/assets/index-*.js` 566 kB (gzip 160 kB),
+`✓ built in 5.1s`. `python manage.py test` → **Ran 54 tests … OK** (51 s; system check reported no
+issues). All 54 live in `apps/core/tests.py`: 10 services, 12 newsletter double opt-in, 17 campaign
+engine, 15 admin email API. The campaign tests run on a throw-away database with Django's
+in-memory email backend — nothing in the suite can reach a real mailbox, and `db.sqlite3` is not
+touched by them.
 
 The dashboard, portal and public pages were exercised in a real browser against the running API:
 sign-in as each role, property create/edit with photo upload and cover switch, lease create and
@@ -228,10 +268,26 @@ invalid-address validation, the server's neutral success message, a confirmation
 the row exactly once, and an unsubscribe link that required no login. Console stayed clean apart
 from two React Router v7 future-flag warnings.
 
-**Not verified:** desktop-width rendering of the newsletter band (the automation browser sat at a
-543×426 viewport, so only the stacked mobile layout was screenshotted and measured), delivery of a
-real email — `EMAIL_BACKEND` here is the console backend, so no message has ever reached an inbox —
-the company logo upload (it would overwrite the real file), and any production deployment steps.
+The email screens were checked against the **running dev server** but over HTTP, not by clicking
+through them: opening `/manage/email/campaigns` signed in as the landlord rendered the
+"This area is not open to your account" panel, the landlord sidebar had no Email section at all, and
+the landlord JWT was refused with 403 by the subscriber list, the campaign list and campaign stats.
+As admin: subscriber and campaign
+lists, both `stats/` payloads, filter + search, `audience-count` (200 for valid audiences, 400 with
+a field error for a bogus one), draft create → PATCH → `preview/` → `recipients/` → `queue/` refused
+with 400 because the audience was empty, `GET …/test/` → 405, `POST`/`PUT`/`DELETE` on the
+subscriber list → 405. The live install reports `email_backend: "console.EmailBackend"` and
+`sends_real_mail: false`, which is the banner the campaigns screen renders. The smoke draft created
+for that check was deleted afterwards; the tables are empty again.
+
+**Not verified:** the campaign screens clicked through in a browser as an ADMIN (the automation
+browser was refused by permission in this session — the render path, the modals and the queue/cancel
+affordances are covered by tests and by a clean build, not by a screenshot); a real campaign run of
+`send_email_campaign` against live data, because there are no confirmed subscribers on this install;
+desktop-width rendering of the newsletter band (the automation browser sat at a 543×426 viewport, so
+only the stacked mobile layout was screenshotted and measured); delivery of a real email —
+`EMAIL_BACKEND` here is the console backend, so no message has ever reached an inbox; the company
+logo upload (it would overwrite the real file); and any production deployment steps.
 
 **Placeholder assets:** `frontend/public/images/{kampala,landlord,contracting}.jpg` are
 AI-generated stand-ins, not Mant Bridges photography. Replace them before launch.

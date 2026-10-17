@@ -62,6 +62,11 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     )
     tin_number = models.CharField(max_length=60, blank=True, default="")
 
+    # Kept separate from having an account: a campaign audience may never include someone
+    # merely because their address is in the database.
+    marketing_opt_in = models.BooleanField(default=False, db_index=True)
+    marketing_opt_in_at = models.DateTimeField(null=True, blank=True)
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=False)
