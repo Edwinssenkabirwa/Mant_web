@@ -1,0 +1,22 @@
+Hi{% if first_name %} {{ first_name }}{% endif %},
+
+One more step before the {{ company_name }} newsletter reaches your inbox.
+
+Please confirm this is really your address by opening the link below. It expires in
+{{ expires_in_hours }} hours and can only be used once.
+
+{{ confirm_url }}
+
+If the link is not clickable, copy it into your browser's address bar.
+
+What you will receive: property opportunities, land documentation guidance, real
+estate insights and new {{ company_name }} articles. Nothing is sent to this address
+until you confirm, and you can unsubscribe at any time with the link in every email:
+
+{{ unsubscribe_url }}
+
+--
+{{ company_name }}
+{{ company.email }}
+{{ address_line }}
+{{ site_url }}

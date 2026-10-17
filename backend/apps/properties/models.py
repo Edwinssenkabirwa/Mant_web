@@ -196,6 +196,11 @@ class PropertyImage(TimeStampedModel):
     image = models.ImageField(upload_to="properties/%Y/%m/")
     caption = models.CharField(max_length=180, blank=True, default="")
     alt_text = models.CharField(max_length=180, blank=True, default="")
+    is_illustrative = models.BooleanField(
+        default=False,
+        help_text="Set for renders and stock art so visitors see the picture is not a "
+                  "photograph of this property.",
+    )
     is_primary = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=0)
 

@@ -128,12 +128,16 @@ class ManagePropertyViewSet(viewsets.ModelViewSet):
         except (TypeError, ValueError):
             order = 0
 
+        def flag(name):
+            return str(request.data.get(name, "")).lower() in ("1", "true", "yes")
+
         image = PropertyImage.objects.create(
             property=property_obj,
             image=upload,
             caption=request.data.get("caption", "") or "",
             alt_text=request.data.get("alt_text", "") or "",
-            is_primary=str(request.data.get("is_primary", "")).lower() in ("1", "true", "yes"),
+            is_illustrative=flag("is_illustrative"),
+            is_primary=flag("is_primary"),
             order=order,
         )
         return Response(

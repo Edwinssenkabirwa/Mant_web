@@ -151,6 +151,11 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DATETIME_FORMAT": "iso-8601",
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
+    # Public newsletter endpoints only; see apps.core.throttles.
+    "DEFAULT_THROTTLE_RATES": {
+        "newsletter_subscribe": os.getenv("NEWSLETTER_SUBSCRIBE_RATE", "20/min"),
+        "newsletter_token": os.getenv("NEWSLETTER_TOKEN_RATE", "60/min"),
+    },
 }
 
 SIMPLE_JWT = {
@@ -187,6 +192,11 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@mantbridges.com")
+
+# Base URL used for the links inside newsletter emails. In development this is the Vite
+# server; production must point it at the public site origin.
+PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "http://127.0.0.1:5173").rstrip("/")
+NEWSLETTER_CONFIRM_HOURS = int(os.getenv("NEWSLETTER_CONFIRM_HOURS", "72"))
 
 LOGGING = {
     "version": 1,

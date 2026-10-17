@@ -6,7 +6,7 @@ from apps.properties.models import Enquiry, Property, PropertyImage
 class PropertyImageInline(admin.TabularInline):
     model = PropertyImage
     extra = 1
-    fields = ("image", "caption", "is_primary", "order")
+    fields = ("image", "caption", "alt_text", "is_illustrative", "is_primary", "order")
 
 
 @admin.register(Property)

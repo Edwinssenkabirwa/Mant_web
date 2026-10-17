@@ -20,7 +20,8 @@ class PropertyImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyImage
-        fields = ["id", "image", "image_url", "caption", "alt_text", "is_primary", "order"]
+        fields = ["id", "image", "image_url", "caption", "alt_text", "is_illustrative",
+                  "is_primary", "order"]
         read_only_fields = ["id", "image_url"]
         extra_kwargs = {"image": {"write_only": True}}
 
@@ -32,6 +33,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
     """Compact payload for listing cards and search results."""
 
     cover_image_url = serializers.SerializerMethodField()
+    cover_is_illustrative = serializers.SerializerMethodField()
     price_display = serializers.SerializerMethodField()
     owner_id = serializers.IntegerField(source="owner.id", read_only=True)
     owner_name = serializers.CharField(source="owner.full_name", read_only=True)
@@ -58,7 +60,8 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "bedrooms", "bathrooms", "parking_spaces", "area", "area_unit",
             "address", "city", "district", "location", "excerpt", "amenities",
             "is_featured", "is_published", "views",
-            "owner_id", "owner_name", "cover_image_url", "created_at",
+            "owner_id", "owner_name", "cover_image_url", "cover_is_illustrative",
+            "created_at",
         ]
 
     def get_cover_image_url(self, obj):
@@ -66,6 +69,10 @@ class PropertyListSerializer(serializers.ModelSerializer):
         if not cover:
             return None
         return absolute_media_url(self.context.get("request"), cover.image)
+
+    def get_cover_is_illustrative(self, obj):
+        cover = obj.cover_image
+        return bool(cover and cover.is_illustrative)
 
     def get_price_display(self, obj):
         suffix = PERIOD_SUFFIX.get(obj.price_period, "")
@@ -96,6 +103,7 @@ class ManagePropertySerializer(serializers.ModelSerializer):
     )
     owner_name = serializers.CharField(source="owner.full_name", read_only=True)
     cover_image_url = serializers.SerializerMethodField()
+    cover_is_illustrative = serializers.SerializerMethodField()
     images = PropertyImageSerializer(many=True, read_only=True)
     price_display = serializers.SerializerMethodField()
 
@@ -109,7 +117,7 @@ class ManagePropertySerializer(serializers.ModelSerializer):
             "parking_spaces", "area", "area_unit", "year_built", "amenities",
             "address", "city", "district", "region", "country", "latitude", "longitude",
             "is_published", "is_featured", "views", "images", "cover_image_url",
-            "created_at", "updated_at",
+            "cover_is_illustrative", "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "slug", "reference", "views", "images", "cover_image_url",
@@ -119,6 +127,10 @@ class ManagePropertySerializer(serializers.ModelSerializer):
     def get_cover_image_url(self, obj):
         cover = obj.cover_image
         return absolute_media_url(self.context.get("request"), cover.image) if cover else None
+
+    def get_cover_is_illustrative(self, obj):
+        cover = obj.cover_image
+        return bool(cover and cover.is_illustrative)
 
     def get_price_display(self, obj):
         suffix = PERIOD_SUFFIX.get(obj.price_period, "")

@@ -1,5 +1,7 @@
 from django.db import models
 
+from apps.core.helpers import unique_slug
+
 
 class TimeStampedModel(models.Model):
     """Adds created/updated tracking to every model that inherits it."""
@@ -92,3 +94,138 @@ class Company(TimeStampedModel):
             "late_fee_flat": str(self.late_fee_flat),
             "late_fee_percent": str(self.late_fee_percent),
         }
+
+
+class ServiceQuerySet(models.QuerySet):
+    def published(self):
+        return self.filter(is_published=True)
+
+
+class ServiceManager(models.Manager):
+    def get_queryset(self):
+        return ServiceQuerySet(self.model, using=self._db)
+
+    def published(self):
+        return self.get_queryset().published()
+
+
+class Service(TimeStampedModel):
+    """A service the company offers, written and published by administrators."""
+
+    class Category(models.TextChoices):
+        PROPERTY_MANAGEMENT = "PROPERTY_MANAGEMENT", "Rent collection and property management"
+        DEBT_RECOVERY = "DEBT_RECOVERY", "Debt recovery"
+        CONTRACTING = "CONTRACTING", "Contracting and lobbying"
+        LAND_DOCUMENTATION = "LAND_DOCUMENTATION", "Land documentation"
+        BUYING_SELLING = "BUYING_SELLING", "Real estate: purchase and sale"
+        OTHER = "OTHER", "Other"
+
+    name = models.CharField(max_length=160)
+    slug = models.SlugField(max_length=180, unique=True, blank=True)
+    category = models.CharField(
+        max_length=30, choices=Category.choices, default=Category.OTHER, blank=True
+    )
+    summary = models.CharField(
+        max_length=300, blank=True, default="",
+        help_text="Short description shown on cards and at the top of the page.",
+    )
+    description = models.TextField(
+        blank=True, default="",
+        help_text="Detailed description. Separate paragraphs with a blank line.",
+    )
+    highlights = models.JSONField(
+        default=list, blank=True,
+        help_text="Bullet points listing what the service covers.",
+    )
+    limitations = models.TextField(
+        blank=True, default="",
+        help_text="What the service does not cover, or cannot guarantee.",
+    )
+    image = models.ImageField(upload_to="services/%Y/%m/", blank=True, null=True)
+    image_alt = models.CharField(max_length=200, blank=True, default="")
+    order = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=False, db_index=True)
+
+    objects = ServiceManager()
+
+    class Meta:
+        ordering = ("order", "name")
+        verbose_name = "Service"
+        verbose_name_plural = "Services"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = unique_slug(Service, self.name, instance=self)
+        super().save(*args, **kwargs)
+
+    @property
+    def paragraphs(self):
+        return [chunk.strip() for chunk in self.description.split("\n\n") if chunk.strip()]
+
+    @property
+    def short_summary(self):
+        if self.summary:
+            return self.summary
+        plain = " ".join(self.description.split())
+        return (plain[:200] + "...") if len(plain) > 200 else plain
+
+
+class NewsletterQuerySet(models.QuerySet):
+    def subscribed(self):
+        """Addresses that completed double opt-in and have not opted back out."""
+        return self.filter(status=NewsletterSubscription.Status.SUBSCRIBED)
+
+
+class NewsletterManager(models.Manager):
+    def get_queryset(self):
+        return NewsletterQuerySet(self.model, using=self._db)
+
+    def subscribed(self):
+        return self.get_queryset().subscribed()
+
+
+class NewsletterSubscription(TimeStampedModel):
+    """A public newsletter address, confirmed by its owner before any mail is sent.
+
+    Only hashes of the emailed tokens are kept, and a previous unsubscribe or
+    suppression is never silently overwritten by a fresh subscription request.
+    """
+
+    class Status(models.TextChoices):
+        PENDING_CONFIRMATION = "PENDING_CONFIRMATION", "Pending confirmation"
+        SUBSCRIBED = "SUBSCRIBED", "Subscribed"
+        UNSUBSCRIBED = "UNSUBSCRIBED", "Unsubscribed"
+        SUPPRESSED = "SUPPRESSED", "Suppressed"
+        BOUNCED = "BOUNCED", "Bounced"
+
+    email = models.EmailField(max_length=254, unique=True)
+    first_name = models.CharField(max_length=120, blank=True, default="")
+    status = models.CharField(
+        max_length=22, choices=Status.choices,
+        default=Status.PENDING_CONFIRMATION, db_index=True,
+    )
+    source = models.CharField(max_length=60, blank=True, default="website")
+    consent_given_at = models.DateTimeField(null=True, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    unsubscribed_at = models.DateTimeField(null=True, blank=True)
+    confirm_token_hash = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    confirm_token_created_at = models.DateTimeField(null=True, blank=True)
+    unsubscribe_token_hash = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    objects = NewsletterManager()
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Newsletter subscription"
+        verbose_name_plural = "Newsletter subscriptions"
+
+    def __str__(self):
+        return self.email
+
+    @property
+    def receives_mail(self):
+        return self.status == self.Status.SUBSCRIBED
