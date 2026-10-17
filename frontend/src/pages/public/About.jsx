@@ -1,11 +1,34 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Building2, Compass, FileText, HandCoins, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Building2, Compass, FileText, HandCoins, Handshake, Scale, ShieldCheck, Target } from 'lucide-react'
 import { propertyCities, propertyStats } from '../../api/properties.js'
 import { useApi } from '../../hooks/useApi.js'
 import { useLookups } from '../../context/LookupContext.jsx'
 import { Breadcrumb, Callout, Stat } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Skeleton } from '../../components/ui/Feedback.jsx'
+
+const BROCHURE_VALUES = [
+  {
+    icon: ShieldCheck,
+    title: 'Professionalism',
+    body: 'A written mandate, a named desk and a reporting calendar. Instructions are answered from records, not memory.',
+  },
+  {
+    icon: Scale,
+    title: 'Integrity',
+    body: 'We say what we are not: not a land registry, not a valuer, not an advocate. Those steps go to a licensed professional.',
+  },
+  {
+    icon: Target,
+    title: 'Results',
+    body: 'Rent collected, arrears recovered, files handed over. Every figure on this site comes from those records.',
+  },
+  {
+    icon: Handshake,
+    title: 'Partnership',
+    body: 'Landlord, tenant and buyer read the same ledger, so nobody has to take our word for what has been paid.',
+  },
+]
 
 const VALUES = [
   {
@@ -41,11 +64,10 @@ export default function About() {
         <div className="container stack">
           <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'About' }]} />
           <p className="eyebrow">About Mant Bridges LTD</p>
-          <h1>{company?.tagline || 'Connecting people to property they can trust.'}</h1>
+          <h1>Managing properties with excellence, creating value that lasts.</h1>
           <p className="lead" style={{ maxWidth: '78ch' }}>
-            {company?.legal_name || company?.name || 'Mant Bridges LTD'} works in Kampala and the surrounding
-            districts on three fronts: property for rent and sale, the administration of tenancies, and the recovery
-            and coordination work that follows.
+            {company?.legal_name || company?.name || 'Mant Bridges LTD'} works in Kampala and the surrounding districts
+            on four fronts: property management, real estate management, lobbying and advocacy, and debt recovery.
           </p>
         </div>
       </section>
@@ -140,6 +162,34 @@ export default function About() {
             </aside>
           </div>
         </div>
+      </section>
+
+      <section className="section arc-band" style={{ background: 'var(--navy-800)', color: '#fff' }}>
+        <div className="container stack">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow" style={{ color: '#ffb3bd' }}>
+                What we stand for
+              </p>
+              <h2 style={{ color: '#fff' }}>Professionalism · Integrity · Results · Partnership</h2>
+              <p style={{ color: 'var(--navy-100)' }}>
+                The four values printed on our brochure, stated the way we can actually be measured against them.
+              </p>
+            </div>
+          </div>
+          <div className="value-band">
+            {BROCHURE_VALUES.map((value) => (
+              <div className="value-item" key={value.title}>
+                <span className="service-badge">
+                  <value.icon size={22} strokeWidth={1.9} />
+                </span>
+                <h4 style={{ color: '#fff', marginBottom: 4 }}>{value.title}</h4>
+                <p style={{ margin: 0, color: 'var(--navy-100)' }}>{value.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <span className="arc-swoosh" aria-hidden="true" />
       </section>
 
       <section className="section" style={{ background: 'var(--surface)' }}>

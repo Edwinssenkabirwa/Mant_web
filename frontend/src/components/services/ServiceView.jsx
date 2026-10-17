@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { Breadcrumb, Callout } from '../ui/Blocks.jsx'
 import { Button } from '../ui/Button.jsx'
+import ServiceBadge from './ServiceBadge.jsx'
 import { mediaUrl } from '../../utils/media.js'
 
 /**
@@ -20,10 +21,10 @@ export default function ServiceView({ record, others = [], preview = false }) {
               { label: record.name },
             ]}
           />
-          <p className="eyebrow" style={{ color: '#ffb3bd' }}>
-            {record.category_display || 'Service'}
-          </p>
-          <h1 style={{ color: '#fff', maxWidth: '22ch' }}>{record.name}</h1>
+          <div className="row" style={{ gap: 13, alignItems: 'center' }}>
+            <ServiceBadge icon={record.icon} />
+            <h1 style={{ color: '#fff', margin: 0, maxWidth: '22ch' }}>{record.name}</h1>
+          </div>
           <p style={{ color: 'var(--navy-100)', maxWidth: '70ch', margin: 0 }}>{record.summary_text}</p>
           {preview && !record.is_published ? (
             <p className="hero-note" style={{ margin: 0 }}>

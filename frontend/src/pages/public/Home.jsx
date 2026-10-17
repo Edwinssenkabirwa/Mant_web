@@ -17,6 +17,7 @@ import { useLookups } from '../../context/LookupContext.jsx'
 import { pluralize } from '../../utils/format.js'
 import PropertyGrid from '../../components/properties/PropertyGrid.jsx'
 import PostCard from '../../components/blog/PostCard.jsx'
+import ServiceBadge from '../../components/services/ServiceBadge.jsx'
 import NewsletterSignup from '../../components/common/NewsletterSignup.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Field, Input, SelectOptions } from '../../components/ui/Form.jsx'
@@ -64,11 +65,15 @@ export default function Home() {
               <p className="eyebrow" style={{ color: '#ffb3bd' }}>
                 Kampala · Uganda
               </p>
-              <h1>Property investment. Professional management. Peace of mind.</h1>
+              <h1>Bridging gaps. Building value.</h1>
+              <p>
+                We connect people to possibilities by managing properties with excellence, creating value that lasts.
+              </p>
               <p>
                 Mant Bridges LTD lists property for rent and sale across Uganda and runs the administration behind it —
                 leases, invoices, payment reconciliation and receipts on one set of books.
               </p>
+              <div className="hero-mission">Your property. Our priority. Your success. Our mission.</div>
               <div className="row" style={{ gap: 12 }}>
                 <Button to="/properties" variant="accent" size="lg">
                   Explore properties <ArrowRight size={17} />
@@ -148,6 +153,66 @@ export default function Home() {
             </form>
           </div>
         </div>
+        <span className="arc-swoosh" aria-hidden="true" />
+      </section>
+
+      <section className="section" style={{ background: 'var(--surface)' }}>
+        <div className="container stack">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Our services</p>
+              <h2>Comprehensive. Professional. Results Driven.</h2>
+              <p>Written mandates, dated records and reporting on a calendar — for the property you already own.</p>
+            </div>
+            <Button to="/services" variant="outline">
+              Service details <ArrowRight size={16} />
+            </Button>
+          </div>
+          {services.loading ? (
+            <Loading label="Loading our services…" />
+          ) : services.error ? (
+            <Callout>Services could not be loaded: {services.error}</Callout>
+          ) : (services.data ?? []).length === 0 ? (
+            <EmptyState icon={Inbox} title="No services are published right now">
+              Our service pages are maintained by the administration team.{' '}
+              <Link to="/contact">Tell us what you need</Link> and we will reply directly.
+            </EmptyState>
+          ) : (
+            <div className="grid grid-4">
+              {services.data.slice(0, 4).map((service) => (
+                <article className="card" key={service.id}>
+                  {service.image_url ? (
+                    <img
+                      className="service-card-image"
+                      src={mediaUrl(service.image_url)}
+                      alt={service.image_alt || service.name}
+                      loading="lazy"
+                      onError={(event) => {
+                        event.currentTarget.src = mediaUrl('')
+                      }}
+                    />
+                  ) : null}
+                  <div className="card-body stack">
+                    <div className="row" style={{ gap: 11, alignItems: 'center' }}>
+                      <ServiceBadge icon={service.icon} />
+                      <h3 style={{ marginBottom: 0 }}>{service.name}</h3>
+                    </div>
+                    <p className="muted" style={{ margin: 0 }}>
+                      {service.summary_text}
+                    </p>
+                    <Link
+                      to={`/services/${service.slug}`}
+                      className="row"
+                      style={{ gap: 6, fontWeight: 700, fontSize: '.88rem' }}
+                    >
+                      How it works <ArrowRight size={15} />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="section">
@@ -171,65 +236,6 @@ export default function Home() {
             emptyTitle="No featured listings right now"
             emptyNote="New listings appear here once our team marks them as featured."
           />
-        </div>
-      </section>
-
-      <section className="section" style={{ background: 'var(--surface)' }}>
-        <div className="container stack">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">What we do</p>
-              <h2>Services run by one accountable team</h2>
-              <p>Written mandates, dated records and reporting on a calendar — for the property you already own.</p>
-            </div>
-            <Button to="/services" variant="outline">
-              Service details <ArrowRight size={16} />
-            </Button>
-          </div>
-          {services.loading ? (
-            <Loading label="Loading our services…" />
-          ) : services.error ? (
-            <Callout>Services could not be loaded: {services.error}</Callout>
-          ) : (services.data ?? []).length === 0 ? (
-            <EmptyState icon={Inbox} title="No services are published right now">
-              Our service pages are maintained by the administration team.{' '}
-              <Link to="/contact">Tell us what you need</Link> and we will reply directly.
-            </EmptyState>
-          ) : (
-            <div className="grid grid-3">
-              {services.data.slice(0, 3).map((service) => (
-                <article className="card" key={service.id}>
-                  {service.image_url ? (
-                    <img
-                      className="service-card-image"
-                      src={mediaUrl(service.image_url)}
-                      alt={service.image_alt || service.name}
-                      loading="lazy"
-                      onError={(event) => {
-                        event.currentTarget.src = mediaUrl('')
-                      }}
-                    />
-                  ) : null}
-                  <div className="card-body stack">
-                    <p className="eyebrow" style={{ marginBottom: 0 }}>
-                      {service.category_display || 'Service'}
-                    </p>
-                    <h3 style={{ marginBottom: 4 }}>{service.name}</h3>
-                    <p className="muted" style={{ margin: 0 }}>
-                      {service.summary_text}
-                    </p>
-                    <Link
-                      to={`/services/${service.slug}`}
-                      className="row"
-                      style={{ gap: 6, fontWeight: 700, fontSize: '.88rem' }}
-                    >
-                      How it works <ArrowRight size={15} />
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
@@ -261,7 +267,7 @@ export default function Home() {
         </section>
       ) : null}
 
-      <section className="section" style={{ background: 'var(--navy-800)', color: '#fff' }}>
+      <section className="section arc-band" style={{ background: 'var(--navy-800)', color: '#fff' }}>
         <div className="container">
           <div className="grid grid-2" style={{ alignItems: 'center', gap: 32 }}>
             <div className="stack">
@@ -298,6 +304,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+        <span className="arc-swoosh" aria-hidden="true" />
       </section>
 
       <section className="section">

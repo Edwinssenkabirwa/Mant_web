@@ -26,7 +26,7 @@ DEFAULT_PASSWORD = "MantDemo@2026"
 COMPANY = {
     "name": "Mant Bridges LTD",
     "legal_name": "Mant Bridges Limited",
-    "tagline": "Connecting people to property they can trust.",
+    "tagline": "Bridging gaps",
     "about": (
         "Mant Bridges LTD is a Kampala-based real estate company managing rentals, sales "
         "and tenancy administration across the Central and Eastern regions of Uganda.\n\n"
@@ -38,13 +38,14 @@ COMPANY = {
         "and what is still outstanding. Tenants get the same clarity, plus a direct line "
         "to our administration team for maintenance, documents and payment queries."
     ),
-    "email": "info@mantbridges.com",
-    "phone": "+256 700 123 456",
-    "alt_phone": "+256 772 987 654",
-    "address": "Plot 14, Bukoto Street, Kisaasi",
+    "email": "mantbridgesltd@gmail.com",
+    "phone": "+256 752629260",
+    "alt_phone": "+256 788075365",
+    "phone_3": "+256 77718484",
+    "address": "Cham Towers, Kampala Road",
     "city": "Kampala",
     "country": "Uganda",
-    "website": "https://mantbridges.com",
+    "website": "https://mantbridgesltd.online",
     "currency": "UGX",
     "currency_symbol": "UGX",
     "invoice_prefix": "MB-INV",
@@ -722,9 +723,10 @@ class Command(BaseCommand):
     def seed_company(self):
         company = Company.load()
         for field, value in COMPANY.items():
-            setattr(company, field, value)
+            if getattr(company, field, None) in (None, "", []):
+                setattr(company, field, value)
         company.save()
-        self.stdout.write("  company profile updated")
+        self.stdout.write("  company profile updated (values already set were left alone)")
         return company
 
     def seed_users(self):

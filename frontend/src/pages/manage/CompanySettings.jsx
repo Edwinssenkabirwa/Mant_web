@@ -13,7 +13,7 @@ import { companyLogo } from '../../utils/media.js'
 
 /** Everything the API treats as a plain string or number on the company record. */
 const FIELDS = [
-  'name', 'legal_name', 'tagline', 'about', 'email', 'phone', 'alt_phone', 'address', 'city',
+  'name', 'legal_name', 'tagline', 'about', 'email', 'phone', 'alt_phone', 'phone_3', 'address', 'city',
   'country', 'website', 'facebook', 'twitter', 'instagram', 'linkedin', 'currency',
   'currency_symbol', 'invoice_prefix', 'receipt_prefix', 'lease_prefix', 'payment_prefix',
   'grace_period_days', 'late_fee_type', 'late_fee_flat', 'late_fee_percent', 'bank_name',
@@ -107,7 +107,11 @@ export default function CompanySettings() {
             <Field name="legal_name" label="Legal name" hint="Used on invoices and receipts where the full registered name is required.">
               <Input name="legal_name" value={form.legal_name} onChange={set('legal_name')} />
             </Field>
-            <Field name="tagline" label="Tagline">
+            <Field
+              name="tagline"
+              label="Wordmark"
+              hint="Printed under the logo in the header and footer. Page headings carry their own copy, so this is not used as a sentence."
+            >
               <Input name="tagline" value={form.tagline} onChange={set('tagline')} />
             </Field>
             <Field name="about" label="About" hint="Shown on the public About page.">
@@ -127,6 +131,9 @@ export default function CompanySettings() {
               </Field>
               <Field name="alt_phone" label="Second line">
                 <Input name="alt_phone" value={form.alt_phone} onChange={set('alt_phone')} />
+              </Field>
+              <Field name="phone_3" label="Third line" hint="Leave blank if the company does not publish a third number.">
+                <Input name="phone_3" value={form.phone_3} onChange={set('phone_3')} />
               </Field>
               <Field name="website" label="Website" hint="Full URL including https://">
                 <Input name="website" value={form.website} onChange={set('website')} error={errors.website} />

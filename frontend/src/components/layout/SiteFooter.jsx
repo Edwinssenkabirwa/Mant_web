@@ -23,9 +23,10 @@ export function SiteFooter() {
           <div>
             <Brand />
             <p className="footer-about" style={{ marginTop: 16 }}>
-              {company?.tagline ||
-                'Connecting people to property they can trust — listings, tenancy administration and rent collection across Uganda.'}
+              Bridging gaps — making possibilities real. Mant Bridges LTD manages property, tenancies and arrears from
+              Kampala, with a written record behind every figure on this site.
             </p>
+            <p className="footer-strip">Professional · Trusted · Result driven</p>
             <div className="row" style={{ marginTop: 16, gap: 10 }}>
               {links.map((item) => (
                 <a
@@ -69,13 +70,16 @@ export function SiteFooter() {
                 {company.email}
               </a>
             ) : null}
-            {company?.phone ? (
-              <a href={`tel:${company.phone.replace(/\s/g, '')}`}>
-                <Phone size={14} style={{ display: 'inline', marginRight: 8, verticalAlign: '-2px' }} />
-                {company.phone}
-              </a>
-            ) : null}
-            {company?.alt_phone ? <a href={`tel:${company.alt_phone.replace(/\s/g, '')}`}>{company.alt_phone}</a> : null}
+            {(company ? [company.phone, company.alt_phone, company.phone_3].filter(Boolean) : []).map(
+              (number, index) => (
+                <a key={number} href={`tel:${number.replace(/\s/g, '')}`}>
+                  {index === 0 ? (
+                    <Phone size={14} style={{ display: 'inline', marginRight: 8, verticalAlign: '-2px' }} />
+                  ) : null}
+                  {number}
+                </a>
+              )
+            )}
             {address ? (
               <p className="footer-about" style={{ marginTop: 12 }}>
                 <MapPin size={14} style={{ display: 'inline', marginRight: 8, verticalAlign: '-2px' }} />

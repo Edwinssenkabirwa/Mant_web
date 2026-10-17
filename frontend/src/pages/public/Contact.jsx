@@ -7,6 +7,7 @@ import { Skeleton } from '../../components/ui/Feedback.jsx'
 
 export default function Contact() {
   const { company } = useLookups()
+  const numbers = company ? [company.phone, company.alt_phone, company.phone_3].filter(Boolean) : []
 
   return (
     <div>
@@ -53,13 +54,15 @@ export default function Contact() {
                         </span>
                         <div>
                           <p className="bold" style={{ margin: 0 }}>Phone</p>
-                          <a href={`tel:${company.phone.replace(/\s/g, '')}`}>{company.phone || 'Not published'}</a>
-                          {company.alt_phone ? (
-                            <>
-                              <br />
-                              <a href={`tel:${company.alt_phone.replace(/\s/g, '')}`}>{company.alt_phone}</a>
-                            </>
-                          ) : null}
+                          {numbers.length ? (
+                            numbers.map((number) => (
+                              <a key={number} href={`tel:${number.replace(/\s/g, '')}`} style={{ display: 'block' }}>
+                                {number}
+                              </a>
+                            ))
+                          ) : (
+                            'Not published'
+                          )}
                         </div>
                       </div>
                       <div className="feature">

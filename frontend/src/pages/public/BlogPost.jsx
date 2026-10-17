@@ -135,7 +135,7 @@ export default function BlogPost() {
                 </div>
               </div>
               <p className="muted small" style={{ margin: 0 }}>
-                {company?.name ?? 'Mant Bridges LTD'} — {company?.tagline ?? 'Property and rent management in Uganda.'}
+                {company?.name ?? 'Mant Bridges LTD'} — Bridging gaps. Building value.
               </p>
               {companyLogo(company) ? (
                 <img src={companyLogo(company)} alt="" style={{ maxHeight: 44, objectFit: 'contain' }} />

@@ -19,8 +19,8 @@ const AREAS = [
   },
   {
     icon: TrendingUp,
-    title: 'Rent bookkeeping',
-    body: 'Invoicing, payment reconciliation, receipt issue and arrears follow-up. Precision with figures matters more than speed.',
+    title: 'Real estate management',
+    body: 'Listings, viewing records, offer negotiation and the paperwork between the first offer and handover.',
   },
   {
     icon: ShieldCheck,
@@ -29,8 +29,8 @@ const AREAS = [
   },
   {
     icon: Handshake,
-    title: 'Contracting and liaison',
-    body: 'Scope writing, contractor coordination and representation on paperwork-heavy processes.',
+    title: 'Lobbying & advocacy',
+    body: 'Representation with authorities, utilities and the land office, and the files those offices expect.',
   },
 ]
 
@@ -42,7 +42,7 @@ export default function Careers() {
       <PageHeader
         eyebrow="Work with us"
         title="Careers at Mant Bridges LTD"
-        lead="We are a small team in Kampala running property management, rent collection and debt recovery. We hire when the work needs another pair of hands, and we say so plainly rather than keeping a permanent advert running."
+        lead="We are a small team in Kampala running property management, real estate management, lobbying and advocacy, and debt recovery. We hire when the work needs another pair of hands, and we say so plainly rather than keeping a permanent advert running."
       />
 
       <div className="split">

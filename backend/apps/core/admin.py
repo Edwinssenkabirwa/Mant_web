@@ -75,7 +75,7 @@ class ServiceAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     ordering = ("order", "name")
     fieldsets = (
-        ("Card", {"fields": ("name", "category", "summary", "order", "is_published")}),
+        ("Card", {"fields": ("name", "category", "icon", "summary", "order", "is_published")}),
         ("Page copy", {"fields": ("description", "highlights", "limitations")}),
         ("Artwork", {"fields": ("image", "image_alt")}),
         ("System", {"fields": ("slug",)}),
@@ -87,7 +87,7 @@ class CompanyAdmin(admin.ModelAdmin):
     list_display = ("name", "email", "phone", "city", "currency", "updated_at")
     fieldsets = (
         ("Identity", {"fields": ("name", "legal_name", "tagline", "about", "logo")}),
-        ("Contact", {"fields": ("email", "phone", "alt_phone", "address", "city",
+        ("Contact", {"fields": ("email", "phone", "alt_phone", "phone_3", "address", "city",
                                  "country", "website")}),
         ("Social", {"fields": ("facebook", "twitter", "instagram", "linkedin")}),
         ("Money & documents", {"fields": ("currency", "currency_symbol", "invoice_prefix",

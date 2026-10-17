@@ -11,7 +11,7 @@ class CompanySerializer(serializers.ModelSerializer):
         model = Company
         fields = [
             "id", "name", "legal_name", "tagline", "about", "email", "phone", "alt_phone",
-            "address", "city", "country", "website", "logo", "logo_url",
+            "phone_3", "address", "city", "country", "website", "logo", "logo_url",
             "facebook", "twitter", "instagram", "linkedin",
             "currency", "currency_symbol",
             "invoice_prefix", "receipt_prefix", "lease_prefix", "payment_prefix",
@@ -41,7 +41,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = [
-            "id", "name", "slug", "category", "category_display", "summary_text",
+            "id", "name", "slug", "category", "category_display", "icon", "summary_text",
             "highlights", "limitations", "image_url", "image_alt", "order",
         ]
 
@@ -69,7 +69,7 @@ class ManageServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = [
-            "id", "name", "slug", "category", "category_display", "summary",
+            "id", "name", "slug", "category", "category_display", "icon", "summary",
             "description", "paragraphs", "summary_text", "highlights", "limitations",
             "image", "image_url", "image_alt", "order", "is_published",
             "created_at", "updated_at",

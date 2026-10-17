@@ -46,6 +46,18 @@ photos.
 Interactive admin is at `http://127.0.0.1:8000/django-admin/`, OpenAPI docs at
 `http://127.0.0.1:8000/api/docs/`, schema at `/api/schema/`.
 
+### Service entries
+
+The website advertises the four offers printed on the company brochures — **Property Management ·
+Real Estate Management · Lobbying & Advocacy · Debt Recovery** — and their wording comes from the
+database, never from a list hard-coded in React. `seed_services` creates them by name and leaves any
+existing row exactly as an administrator set it; `attach_service_images` puts the matching
+illustration from `backend/seed_images/services/<slug>.jpg` onto a service that has no picture yet,
+without touching an uploaded photograph. `Service.icon` is a whitelisted key that the frontend maps
+to its own icon set, so a value outside the list renders no badge. Migration `core.0006` folded the
+five rows seeded before the brochures into these four; the withdrawn "Land documentation" row keeps
+its text and artwork and is only unpublished.
+
 ### `backend/.env`
 
 | Variable | Purpose |
@@ -251,12 +263,20 @@ in-memory backend and assert on `mail.outbox`.
 
 ## Verification status
 
-`npm run build` → `✓ 2085 modules transformed`, `dist/assets/index-*.js` 566 kB (gzip 160 kB),
-`✓ built in 5.1s`. `python manage.py test` → **Ran 54 tests … OK** (51 s; system check reported no
-issues). All 54 live in `apps/core/tests.py`: 10 services, 12 newsletter double opt-in, 17 campaign
-engine, 15 admin email API. The campaign tests run on a throw-away database with Django's
+`npm run build` → `✓ 2086 modules transformed`, `dist/assets/index-*.js` 571 kB (gzip 162 kB),
+`✓ built in 6.2s`. `python manage.py test` → **Ran 57 tests … OK** (91 s; system check reported no
+issues). All 57 live in `apps/core/tests.py`: 13 services and seeding, 12 newsletter double opt-in,
+17 campaign engine, 15 admin email API. The campaign tests run on a throw-away database with Django's
 in-memory email backend — nothing in the suite can reach a real mailbox, and `db.sqlite3` is not
 touched by them.
+
+The brochure wording pass was verified against the running dev server over HTTP: `/api/services/`
+returns the four published offers with their `icon` keys and slugs
+(`property-management`, `real-estate-management`, `lobbying-and-advocacy`, `debt-recovery`), the
+withdrawn `land-documentation` slug returns 404 rather than a half-rendered page, and `/api/company/`
+carries all three published phone numbers with the Cham Towers address. No blog post or email
+template linked an old service slug, so nothing internal broke; links shared outside the site would
+need updating.
 
 The dashboard, portal and public pages were exercised in a real browser against the running API:
 sign-in as each role, property create/edit with photo upload and cover switch, lease create and
@@ -280,7 +300,10 @@ subscriber list → 405. The live install reports `email_backend: "console.Email
 `sends_real_mail: false`, which is the banner the campaigns screen renders. The smoke draft created
 for that check was deleted afterwards; the tables are empty again.
 
-**Not verified:** the campaign screens clicked through in a browser as an ADMIN (the automation
+**Not verified:** the brochure wording and the new badge/arc motifs looked at in a browser — the
+automation browser is still refused by permission in this session, so the service badges, the arc
+divider and the About values band are covered by a clean build and by the classes being present in
+`dist/assets/index-*.css`, not by a screenshot; the campaign screens clicked through in a browser as an ADMIN (the automation
 browser was refused by permission in this session — the render path, the modals and the queue/cancel
 affordances are covered by tests and by a clean build, not by a screenshot); a real campaign run of
 `send_email_campaign` against live data, because there are no confirmed subscribers on this install;

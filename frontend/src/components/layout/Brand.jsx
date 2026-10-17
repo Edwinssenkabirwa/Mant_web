@@ -18,7 +18,7 @@ export function Brand({ compact = false }) {
       )}
       <span className="brand-text">
         <span className="brand-name">{company?.name || 'Mant Bridges'}</span>
-        {compact ? null : <span className="brand-sub">Bridging Gaps</span>}
+        {compact ? null : <span className="brand-sub">{company?.tagline || 'Bridging Gaps'}</span>}
       </span>
     </Link>
   )

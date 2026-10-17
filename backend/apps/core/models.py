@@ -33,12 +33,18 @@ class Company(TimeStampedModel):
     name = models.CharField(max_length=150, default="Mant Bridges LTD")
     legal_name = models.CharField(max_length=200, blank=True, default="")
     tagline = models.CharField(
-        max_length=255, blank=True, default="Connecting people to property they can trust."
+        max_length=255, blank=True, default="Bridging gaps",
+        help_text="The brand wordmark shown under the logo. Not a sentence — page headings "
+                  "carry their own copy.",
     )
     about = models.TextField(blank=True, default="")
-    email = models.EmailField(default="info@mantbridges.com")
+    email = models.EmailField(default="mantbridgesltd@gmail.com")
     phone = models.CharField(max_length=40, blank=True, default="")
     alt_phone = models.CharField(max_length=40, blank=True, default="")
+    phone_3 = models.CharField(
+        max_length=40, blank=True, default="", verbose_name="third phone",
+        help_text="A third line, if the company publishes one.",
+    )
     address = models.CharField(max_length=255, blank=True, default="")
     city = models.CharField(max_length=120, blank=True, default="")
     country = models.CharField(max_length=120, default="Uganda")
@@ -114,17 +120,33 @@ class Service(TimeStampedModel):
     """A service the company offers, written and published by administrators."""
 
     class Category(models.TextChoices):
-        PROPERTY_MANAGEMENT = "PROPERTY_MANAGEMENT", "Rent collection and property management"
+        PROPERTY_MANAGEMENT = "PROPERTY_MANAGEMENT", "Property management"
+        REAL_ESTATE_MANAGEMENT = "REAL_ESTATE_MANAGEMENT", "Real estate management"
+        LOBBYING_ADVOCACY = "LOBBYING_ADVOCACY", "Lobbying & advocacy"
         DEBT_RECOVERY = "DEBT_RECOVERY", "Debt recovery"
-        CONTRACTING = "CONTRACTING", "Contracting and lobbying"
-        LAND_DOCUMENTATION = "LAND_DOCUMENTATION", "Land documentation"
-        BUYING_SELLING = "BUYING_SELLING", "Real estate: purchase and sale"
         OTHER = "OTHER", "Other"
+
+    class Icon(models.TextChoices):
+        """Keys the frontend maps to its own icon set; the name never reaches React as a component."""
+
+        BUILDING = "building", "Building"
+        KEYS = "keys", "Keys"
+        LANDMARK = "landmark", "Landmark"
+        GAVEL = "gavel", "Gavel"
+        HANDSHAKE = "handshake", "Handshake"
+        SHIELD = "shield", "Shield"
+        DOCUMENT = "document", "Document"
+        COINS = "coins", "Coins"
+        NONE = "", "No icon"
 
     name = models.CharField(max_length=160)
     slug = models.SlugField(max_length=180, unique=True, blank=True)
     category = models.CharField(
         max_length=30, choices=Category.choices, default=Category.OTHER, blank=True
+    )
+    icon = models.CharField(
+        max_length=20, choices=Icon.choices, default=Icon.NONE, blank=True,
+        help_text="Shown as the round badge on the service cards.",
     )
     summary = models.CharField(
         max_length=300, blank=True, default="",

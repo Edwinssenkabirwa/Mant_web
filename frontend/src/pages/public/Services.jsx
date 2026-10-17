@@ -10,7 +10,7 @@ import {
 import { listServices } from '../../api/services.js'
 import { collect } from '../../api/paginate.js'
 import { useApi } from '../../hooks/useApi.js'
-import { useLookups } from '../../context/LookupContext.jsx'
+import ServiceBadge from '../../components/services/ServiceBadge.jsx'
 import { Callout } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { EmptyState, ErrorState, Loading } from '../../components/ui/Feedback.jsx'
@@ -40,23 +40,25 @@ const PROCESS = [
 ]
 
 export default function Services() {
-  const { company } = useLookups()
   const services = useApi(() => collect(listServices, {}, 5), [])
 
   return (
     <div>
-      <section className="section-tight" style={{ background: 'var(--navy-800)', color: '#fff', padding: '44px 0' }}>
+      <section
+        className="section-tight arc-band"
+        style={{ background: 'var(--navy-800)', color: '#fff', padding: '44px 0 74px' }}
+      >
         <div className="container stack">
           <p className="eyebrow" style={{ color: '#ffb3bd' }}>
-            Services
+            Our services
           </p>
-          <h1 style={{ color: '#fff', maxWidth: '24ch' }}>
-            Property administration, rent recovery and site coordination
-          </h1>
+          <h1 style={{ color: '#fff', maxWidth: '24ch' }}>Comprehensive. Professional. Results Driven.</h1>
           <p style={{ color: 'var(--navy-100)', maxWidth: '70ch', margin: 0 }}>
-            {company?.tagline || 'Mant Bridges LTD runs the paperwork and the money behind a property.'}
+            Four offers, written as our brochures describe them: property management, real estate management, lobbying
+            and advocacy, and debt recovery — each run from the same administration desk in Kampala.
           </p>
         </div>
+        <span className="arc-swoosh" aria-hidden="true" />
       </section>
 
       <div className="container stack stack-lg">
@@ -88,10 +90,8 @@ export default function Services() {
                 </>
               ) : null}
               <div className="card-body stack">
-                <div className="stack stack-sm">
-                  <p className="eyebrow" style={{ color: '#ffb3bd', marginBottom: 0 }}>
-                    {service.category_display || 'Service'}
-                  </p>
+                <div className="row" style={{ gap: 13, alignItems: 'center' }}>
+                  <ServiceBadge icon={service.icon} />
                   <h2 style={{ margin: 0, color: '#fff' }}>{service.name}</h2>
                 </div>
                 <p className="lead" style={{ margin: 0, color: 'var(--navy-100)' }}>

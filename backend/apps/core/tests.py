@@ -55,7 +55,7 @@ class ServiceApiTests(ApiTestCase):
         return Service.objects.create(**payload)
 
     def test_public_list_returns_only_published(self):
-        live = self.publish()
+        live = self.publish(icon=Service.Icon.BUILDING)
         hidden = self.publish(name="Draft service", is_published=False, order=2)
 
         response = self.client.get("/api/services/")
@@ -63,6 +63,17 @@ class ServiceApiTests(ApiTestCase):
         slugs = [row["slug"] for row in response.json()["results"]]
         self.assertEqual(slugs, [live.slug])
         self.assertNotIn(hidden.slug, slugs)
+        self.assertEqual(response.json()["results"][0]["icon"], Service.Icon.BUILDING)
+
+    def test_an_icon_outside_the_whitelist_is_refused(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/manage/services/",
+            {"name": "Rocket services", "icon": "rocket"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("icon", response.json()["errors"])
 
     def test_public_detail_rejects_unpublished_service(self):
         hidden = self.publish(name="Draft service", is_published=False)
@@ -106,7 +117,8 @@ class ServiceApiTests(ApiTestCase):
             "/api/manage/services/",
             {
                 "name": "Land documentation",
-                "category": Service.Category.LAND_DOCUMENTATION,
+                "category": Service.Category.OTHER,
+                "icon": Service.Icon.DOCUMENT,
                 "summary": "Paperwork support.",
                 "description": "We assemble the file.",
                 "highlights": ["Checklist", "Follow-up"],
@@ -120,6 +132,7 @@ class ServiceApiTests(ApiTestCase):
         self.assertEqual(response.status_code, 201, response.data)
         body = response.json()
         self.assertEqual(body["slug"], "land-documentation")
+        self.assertEqual(body["icon"], Service.Icon.DOCUMENT)
         self.assertIsNone(body["image_url"])
 
         uploaded = self.client.patch(
@@ -179,10 +192,10 @@ class SeedServicesCommandTests(ApiTestCase):
     def test_second_run_does_not_duplicate_or_overwrite_admin_edits(self):
         call_command("seed_services", verbosity=0)
         first_ids = set(Service.objects.values_list("id", flat=True))
-        self.assertEqual(len(first_ids), 5)
-        self.assertEqual(Service.objects.published().count(), 5)
+        self.assertEqual(len(first_ids), 4)
+        self.assertEqual(Service.objects.published().count(), 4)
 
-        edited = Service.objects.get(name="Debt recovery")
+        edited = Service.objects.get(name="Debt Recovery")
         edited.summary = "Rewritten by an administrator."
         edited.is_published = False
         edited.save()
@@ -194,11 +207,25 @@ class SeedServicesCommandTests(ApiTestCase):
         self.assertEqual(edited.summary, "Rewritten by an administrator.")
         self.assertFalse(edited.is_published)
 
-    def test_land_documentation_does_not_claim_registry_status(self):
+    def test_seeded_names_are_the_four_brochure_offers(self):
         call_command("seed_services", verbosity=0)
-        service = Service.objects.get(category=Service.Category.LAND_DOCUMENTATION)
+        self.assertEqual(
+            list(Service.objects.order_by("order").values_list("name", flat=True)),
+            ["Property Management", "Real Estate Management", "Lobbying & Advocacy", "Debt Recovery"],
+        )
+
+    def test_icons_stay_inside_the_whitelist_the_frontend_renders(self):
+        call_command("seed_services", verbosity=0)
+        allowed = {value for value, _ in Service.Icon.choices}
+        for service in Service.objects.all():
+            self.assertIn(service.icon, allowed)
+
+    def test_lobbying_does_not_claim_registry_or_advocate_status(self):
+        call_command("seed_services", verbosity=0)
+        service = Service.objects.get(category=Service.Category.LOBBYING_ADVOCACY)
         text = f"{service.summary} {service.description} {service.limitations}".lower()
         self.assertIn("not a land registry", text)
+        self.assertIn("licensed advocate", text)
         self.assertNotIn("guarantee title", text)
 
 
