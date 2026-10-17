@@ -24,7 +24,13 @@ export default function Gallery({ images = [], title = 'Property' }) {
         <img
           src={mediaUrl(current.image_url)}
           alt={current.alt_text || current.caption || `${title} — photo ${active + 1}`}
+          onError={(event) => {
+            event.currentTarget.src = mediaUrl('')
+          }}
         />
+        {current.is_illustrative ? (
+          <p className="gallery-note">Illustrative render — not a photograph of this property</p>
+        ) : null}
       </div>
       {images.length > 1 ? (
         <div className="gallery-thumbs" role="group" aria-label="Photo thumbnails">

@@ -944,6 +944,143 @@ hr {
 
 .search-panel .field { margin-bottom: 12px; }
 
+/* Hero photograph. The section keeps the navy gradient underneath, so a missing
+   or slow image leaves a readable hero rather than a blank rectangle. */
+.hero-photo {
+  padding: 96px 0 104px;
+}
+
+.hero-bg,
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-bg {
+  object-fit: cover;
+  object-position: center 62%;
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+
+.hero-bg.is-loaded {
+  opacity: 1;
+}
+
+.hero-scrim {
+  background:
+    radial-gradient(900px 420px at 88% -10%, rgba(215, 38, 61, 0.26), transparent 62%),
+    linear-gradient(
+      100deg,
+      rgba(8, 28, 54, 0.95) 0%,
+      rgba(11, 37, 69, 0.88) 38%,
+      rgba(11, 37, 69, 0.62) 68%,
+      rgba(11, 37, 69, 0.4) 100%
+    );
+}
+
+.hero-photo > .container {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-note {
+  font-size: 0.78rem;
+  color: var(--navy-100);
+  opacity: 0.85;
+}
+
+.service-card-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+/* Services page: the picture sits behind the copy instead of above it. */
+.service-banner {
+  position: relative;
+  isolation: isolate;
+  background: var(--navy-800);
+  color: #fff;
+}
+
+.service-banner-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.service-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    100deg,
+    rgba(8, 28, 54, 0.96) 0%,
+    rgba(11, 37, 69, 0.92) 42%,
+    rgba(11, 37, 69, 0.78) 72%,
+    rgba(11, 37, 69, 0.66) 100%
+  );
+}
+
+.service-banner > .card-body {
+  min-height: 320px;
+  max-width: 78ch;
+  padding: 30px;
+}
+
+.service-banner .callout {
+  background: rgba(8, 28, 54, 0.5);
+  border-left-color: var(--red-500);
+  color: var(--navy-100);
+}
+
+.service-banner .btn-outline {
+  --btn-fg: #fff;
+  --btn-border: rgba(255, 255, 255, 0.45);
+}
+.service-banner .btn-outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: #fff;
+  color: #fff;
+}
+
+.service-banner .btn-ghost {
+  --btn-fg: var(--navy-100);
+}
+.service-banner .btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.service-hero-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+}
+
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.hero-rise {
+  animation: hero-rise 560ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.hero-rise-late {
+  animation: hero-rise 560ms cubic-bezier(0.22, 0.61, 0.36, 1) 140ms both;
+}
+
 /* ---------- Footer ------------------------------------------------------ */
 .site-footer {
   background: var(--navy-900);
@@ -1091,6 +1228,20 @@ hr {
   overflow: hidden;
   background: var(--navy-50);
   border: 1px solid var(--line);
+  position: relative;
+}
+
+.gallery-note {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(8, 28, 54, 0.82);
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
 }
 
 .gallery-main img {
@@ -2243,6 +2394,18 @@ hr {
   .footer-grid { grid-template-columns: minmax(0, 1fr); }
   .section { padding-block: 38px; }
   .hero { padding: 48px 0 56px; }
+  .hero-photo { padding: 52px 0 60px; }
+  .hero-scrim {
+    background:
+      radial-gradient(600px 300px at 90% -8%, rgba(215, 38, 61, 0.22), transparent 62%),
+      linear-gradient(180deg, rgba(8, 28, 54, 0.96) 0%, rgba(11, 37, 69, 0.92) 60%, rgba(11, 37, 69, 0.8) 100%);
+  }
+  .hero-bg { object-position: center 40%; }
+  .service-banner > .card-body { min-height: 0; padding: 22px; }
+  .service-banner-scrim {
+    background: linear-gradient(180deg, rgba(8, 28, 54, 0.96) 0%, rgba(11, 37, 69, 0.93) 62%, rgba(11, 37, 69, 0.88) 100%);
+  }
+  .service-banner-bg { object-position: center 45%; }
   .dash-content { padding: 18px 14px; }
   .dash-topbar { padding: 12px 14px; }
   .kv { grid-template-columns: minmax(0, 1fr); gap: 2px; }
@@ -2419,4 +2582,100 @@ hr {
 .image-cell > .row {
   padding: 4px 6px;
   border-top: 1px solid var(--line);
+}
+
+/* ---------- Newsletter sign-up ------------------------------------------- */
+
+.newsletter-band {
+  background:
+    radial-gradient(680px 320px at 12% -20%, rgba(215, 38, 61, 0.26), transparent 62%),
+    linear-gradient(160deg, #081c36 0%, var(--navy-800) 55%, #102a4d 100%);
+  color: #fff;
+  padding: 46px 0 50px;
+}
+
+.newsletter-inner {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 34px;
+  align-items: center;
+}
+
+.newsletter-band .eyebrow {
+  color: #ffb3bd;
+}
+
+.newsletter-band h2 {
+  color: #fff;
+}
+
+.newsletter-band .newsletter-form {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.newsletter-band .newsletter-form .field > label,
+.newsletter-band .newsletter-form .label {
+  color: #fff;
+}
+
+.newsletter-band .newsletter-form .input {
+  background: #fff;
+  color: var(--ink);
+}
+
+.newsletter-band .newsletter-form .check,
+.newsletter-band .newsletter-form .check > span {
+  color: var(--navy-100);
+}
+
+.newsletter-form .field {
+  flex: 1 1 220px;
+}
+
+.newsletter-fields {
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.newsletter-band .hint {
+  color: var(--navy-100);
+}
+
+.newsletter-band .field-error {
+  color: #ffd0d8;
+}
+
+.newsletter-band .alert-success {
+  background: rgba(8, 58, 44, 0.6);
+  border: 1px solid rgba(58, 172, 136, 0.5);
+  color: #dcf7ea;
+}
+
+.newsletter-card {
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow: visible;
+}
+
+@media (max-width: 900px) {
+  .newsletter-inner {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .newsletter-band {
+    padding: 34px 0 38px;
+  }
+}
+
+/* Below this width the two inputs would sit side by side at uneven heights. */
+@media (max-width: 720px) {
+  .newsletter-fields {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

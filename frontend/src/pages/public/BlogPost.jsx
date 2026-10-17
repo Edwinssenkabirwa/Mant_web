@@ -7,6 +7,7 @@ import { useLookups } from '../../context/LookupContext.jsx'
 import { companyLogo, mediaUrl } from '../../utils/media.js'
 import { dateLabel } from '../../utils/format.js'
 import PostCard from '../../components/blog/PostCard.jsx'
+import NewsletterSignup from '../../components/common/NewsletterSignup.jsx'
 import { Breadcrumb, Callout, Avatar } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { ErrorState, Loading } from '../../components/ui/Feedback.jsx'
@@ -112,6 +113,8 @@ export default function BlogPost() {
               </Callout>
             ) : null}
           </header>
+
+          <NewsletterSignup variant="card" source="blog-article" />
         </div>
 
         <aside className="sticky-side stack">

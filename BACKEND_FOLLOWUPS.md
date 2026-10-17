@@ -197,7 +197,36 @@ thread renders a download link. There are no email or SMS notifications, so noth
 reader in — the inbox page says so.
 
 **Proposed:** notification fan-out (email at minimum, using the existing `EMAIL_*` settings),
-plus a `Notification` model if in-app bell behaviour is wanted.
+plus a `Notification` model if in-app bell behaviour is wanted. The newsletter engine
+(`apps/core/services/newsletter.py`) is the shared delivery path this should build on.
+
+---
+
+## 16. Email campaigns, blog distribution and delivery truth (high, next)
+
+**Current state:** only the newsletter confirmation email exists. `NewsletterSubscription` records
+who may be mailed, and `NewsletterSubscription.objects.subscribed()` is the eligible audience, but
+there is no campaign model, no admin subscriber screen, no queue and no provider feedback loop.
+Nothing has ever been delivered for real: `EMAIL_BACKEND` is the console backend in development.
+
+**Needed before any bulk mail:**
+
+1. `EmailCampaign` + `EmailCampaignRecipient` and an admin UI at `/manage/email/subscribers` and
+   `/manage/email/campaigns`. Recipient eligibility must be resolved server-side, deduplicated by
+   normalised address, and never allowed to override `SUPPRESSED`/`BOUNCED`.
+2. A queue and worker (Django-Q2/Celery, or `manage.py` + cron for a start). One confirmation email
+   inside a request is fine; a campaign is not. Bounded retries with backoff, and provider rate limits
+   respected.
+3. Delivery records fed by provider webhooks, verified by signature and applied idempotently. Until
+   then the honest vocabulary is *accepted by provider*, *failed* and *bounced* — "delivered" must not
+   be shown, because nothing proves the message reached an inbox.
+4. Suppression on hard bounce and complaint, and a preferences page that keeps essential operational
+   mail outside the marketing opt-out.
+
+**Production email setup:** a transactional provider with a verified sender on a domain that has
+SPF, DKIM and DMARC records; `DEFAULT_FROM_EMAIL`, `PUBLIC_SITE_URL` and the `EMAIL_*` variables in
+`backend/.env`. Do not claim real delivery until a message has been received at Gmail, Yahoo and
+Outlook addresses from that configuration.
 
 ---
 

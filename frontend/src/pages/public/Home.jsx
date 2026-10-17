@@ -4,53 +4,37 @@ import {
   ArrowRight,
   BadgeCheck,
   Building2,
-  HandCoins,
+  Inbox,
   MessageSquare,
-  Scale,
   Search,
   ShieldCheck,
-  Wrench,
 } from 'lucide-react'
 import { featuredProperties, listProperties, propertyCities, propertyStats } from '../../api/properties.js'
+import { listServices } from '../../api/services.js'
+import { collect } from '../../api/paginate.js'
 import { latestPosts } from '../../api/blog.js'
 import { useLookups } from '../../context/LookupContext.jsx'
 import { pluralize } from '../../utils/format.js'
 import PropertyGrid from '../../components/properties/PropertyGrid.jsx'
 import PostCard from '../../components/blog/PostCard.jsx'
+import NewsletterSignup from '../../components/common/NewsletterSignup.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Field, Input, SelectOptions } from '../../components/ui/Form.jsx'
 import { Callout } from '../../components/ui/Blocks.jsx'
+import { EmptyState, Loading } from '../../components/ui/Feedback.jsx'
 import { useApi } from '../../hooks/useApi.js'
-
-const SERVICES = [
-  {
-    icon: HandCoins,
-    title: 'Rent collection and property management',
-    body: 'Tenancy setup, invoicing, payment reconciliation and receipts, with a running statement you can audit at any time.',
-    to: '/services',
-  },
-  {
-    icon: Scale,
-    title: 'Debt recovery',
-    body: 'Structured follow-up on arrears — documentation, negotiation and escalation through the channels your agreement allows.',
-    to: '/services',
-  },
-  {
-    icon: Wrench,
-    title: 'Contracting and lobbying',
-    body: 'Coordination of works and representation of property interests with authorities and service providers.',
-    to: '/services',
-  },
-]
+import { mediaUrl } from '../../utils/media.js'
 
 export default function Home() {
   const { options } = useLookups()
   const navigate = useNavigate()
   const [search, setSearch] = useState({ listing_type: '', property_type: '', city: '' })
+  const [heroImage, setHeroImage] = useState('loading')
   const featured = useApi(() => featuredProperties(), [])
   const stats = useApi(() => propertyStats(), [])
   const cityFacets = useApi(() => propertyCities(), [])
   const posts = useApi(() => latestPosts(), [])
+  const services = useApi(() => collect(listServices, {}, 3), [])
   const popular = useApi(() => listProperties({ listing_type: 'SALE', ordering: '-created_at' }), [])
 
   const runSearch = (event) => {
@@ -62,24 +46,35 @@ export default function Home() {
 
   return (
     <>
-      <section className="hero">
+      <section className="hero hero-photo">
+        {/* Decorative artwork. If it never loads the navy gradient underneath still reads. */}
+        <img
+          className={`hero-bg${heroImage === 'loaded' ? ' is-loaded' : ''}`}
+          src="/images/hero-kampala-residential.jpg"
+          alt=""
+          aria-hidden="true"
+          fetchPriority="high"
+          onLoad={() => setHeroImage('loaded')}
+          onError={() => setHeroImage('failed')}
+        />
+        <div className="hero-scrim" aria-hidden="true" />
         <div className="container">
           <div className="hero-grid">
-            <div className="stack">
+            <div className="stack hero-rise">
               <p className="eyebrow" style={{ color: '#ffb3bd' }}>
                 Kampala · Uganda
               </p>
-              <h1>Verified property, managed rent, clear records.</h1>
+              <h1>Property investment. Professional management. Peace of mind.</h1>
               <p>
                 Mant Bridges LTD lists property for rent and sale across Uganda and runs the administration behind it —
                 leases, invoices, payment reconciliation and receipts on one set of books.
               </p>
               <div className="row" style={{ gap: 12 }}>
                 <Button to="/properties" variant="accent" size="lg">
-                  Browse listings <ArrowRight size={17} />
+                  Explore properties <ArrowRight size={17} />
                 </Button>
-                <Button to="/contact" variant="light" size="lg">
-                  Talk to us about your property
+                <Button to="/services" variant="light" size="lg">
+                  Our services
                 </Button>
               </div>
               {stats.data ? (
@@ -104,7 +99,7 @@ export default function Home() {
               ) : null}
             </div>
 
-            <form className="search-panel stack" onSubmit={runSearch}>
+            <form className="search-panel stack hero-rise-late" onSubmit={runSearch}>
               <h3>Find a property</h3>
               <Field name="listing_type" label="I want to">
                 <Input
@@ -147,6 +142,9 @@ export default function Home() {
               <p className="hint" style={{ margin: 0 }}>
                 Availability shown here comes from live listings published by our landlords and team.
               </p>
+              <p className="hero-note" style={{ margin: 0 }}>
+                The neighbourhood picture above is an illustrative render, not a photograph of a listed property.
+              </p>
             </form>
           </div>
         </div>
@@ -181,30 +179,57 @@ export default function Home() {
           <div className="section-head">
             <div>
               <p className="eyebrow">What we do</p>
-              <h2>Three services, one accountable team</h2>
+              <h2>Services run by one accountable team</h2>
+              <p>Written mandates, dated records and reporting on a calendar — for the property you already own.</p>
             </div>
             <Button to="/services" variant="outline">
               Service details <ArrowRight size={16} />
             </Button>
           </div>
-          <div className="grid grid-3">
-            {SERVICES.map((service) => (
-              <article className="card" key={service.title}>
-                <div className="card-body stack">
-                  <span className="icon-tile">
-                    <service.icon size={20} />
-                  </span>
-                  <h3 style={{ marginBottom: 4 }}>{service.title}</h3>
-                  <p className="muted" style={{ margin: 0 }}>
-                    {service.body}
-                  </p>
-                  <Link to={service.to} className="row" style={{ gap: 6, fontWeight: 700, fontSize: '.88rem' }}>
-                    How it works <ArrowRight size={15} />
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+          {services.loading ? (
+            <Loading label="Loading our services…" />
+          ) : services.error ? (
+            <Callout>Services could not be loaded: {services.error}</Callout>
+          ) : (services.data ?? []).length === 0 ? (
+            <EmptyState icon={Inbox} title="No services are published right now">
+              Our service pages are maintained by the administration team.{' '}
+              <Link to="/contact">Tell us what you need</Link> and we will reply directly.
+            </EmptyState>
+          ) : (
+            <div className="grid grid-3">
+              {services.data.slice(0, 3).map((service) => (
+                <article className="card" key={service.id}>
+                  {service.image_url ? (
+                    <img
+                      className="service-card-image"
+                      src={mediaUrl(service.image_url)}
+                      alt={service.image_alt || service.name}
+                      loading="lazy"
+                      onError={(event) => {
+                        event.currentTarget.src = mediaUrl('')
+                      }}
+                    />
+                  ) : null}
+                  <div className="card-body stack">
+                    <p className="eyebrow" style={{ marginBottom: 0 }}>
+                      {service.category_display || 'Service'}
+                    </p>
+                    <h3 style={{ marginBottom: 4 }}>{service.name}</h3>
+                    <p className="muted" style={{ margin: 0 }}>
+                      {service.summary_text}
+                    </p>
+                    <Link
+                      to={`/services/${service.slug}`}
+                      className="row"
+                      style={{ gap: 6, fontWeight: 700, fontSize: '.88rem' }}
+                    >
+                      How it works <ArrowRight size={15} />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -294,6 +319,8 @@ export default function Home() {
           {posts.error ? <Callout>Blog posts could not be loaded: {posts.error}</Callout> : null}
         </div>
       </section>
+
+      <NewsletterSignup variant="band" source="homepage" />
 
       <section className="section" style={{ background: 'var(--surface)' }}>
         <div className="container stack">

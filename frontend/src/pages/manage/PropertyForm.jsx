@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Star, Trash2, Upload } from 'lucide-react'
+import { ArrowLeft, Save, Sparkles, Star, Trash2, Upload } from 'lucide-react'
 import {
   addPropertyImage,
   createProperty,
@@ -84,6 +84,7 @@ export default function PropertyForm() {
   const [form, setForm] = useState(() => ({ ...BLANK, currency: company?.currency || 'UGX' }))
   const [file, setFile] = useState(null)
   const [caption, setCaption] = useState('')
+  const [illustrative, setIllustrative] = useState(false)
   const fileInput = useRef(null)
 
   const existing = useApi(() => manageById(id), [id], { skip: !id })
@@ -124,6 +125,7 @@ export default function PropertyForm() {
       const data = new FormData()
       data.append('image', file)
       if (caption) data.append('caption', caption)
+      if (illustrative) data.append('is_illustrative', 'true')
       return addPropertyImage(id, data)
     },
     {
@@ -131,6 +133,7 @@ export default function PropertyForm() {
         toast.success('Photo added.')
         setFile(null)
         setCaption('')
+        setIllustrative(false)
         if (fileInput.current) fileInput.current.value = ''
         existing.reload()
       },
@@ -145,8 +148,15 @@ export default function PropertyForm() {
     { onDone: () => toast.success('Cover photo changed.') }
   )
 
-  const dropImage = useAction(
+  const toggleIllustrative = useAction(
     async (image) => {
+      await updatePropertyImage(image.id, { is_illustrative: !image.is_illustrative })
+      return existing.reload()
+    },
+    { onDone: () => toast.success('Photo label updated.') }
+  )
+
+  const dropImage = useAction(    async (image) => {
       await deletePropertyImage(image.id)
       return existing.reload()
     },
@@ -436,6 +446,17 @@ export default function PropertyForm() {
                           </button>
                           <button
                             type="button"
+                            className="btn btn-ghost btn-sm"
+                            title="Mark this photo as an illustrative render rather than a photograph"
+                            onClick={() => toggleIllustrative.execute(image)}
+                            disabled={toggleIllustrative.pending}
+                            style={image.is_illustrative ? { color: 'var(--warn)' } : undefined}
+                          >
+                            <Sparkles size={13} />
+                            {image.is_illustrative ? 'Illustrative' : 'Mark render'}
+                          </button>
+                          <button
+                            type="button"
                             className="btn btn-ghost btn-sm btn-icon"
                             title="Delete photo"
                             onClick={() => dropImage.execute(image)}
@@ -466,6 +487,13 @@ export default function PropertyForm() {
                 <Field name="caption" label="Caption" hint="Optional label shown under the photo.">
                   <Input name="caption" value={caption} onChange={setCaption} />
                 </Field>
+                <Check
+                  name="illustrative"
+                  label="This is a render or stock image, not a photograph of this property"
+                  hint="Visitors then see it labelled as illustrative."
+                  checked={illustrative}
+                  onChange={setIllustrative}
+                />
                 <Button block onClick={uploadImage.execute} pending={uploadImage.pending} disabled={!file}>
                   <Upload size={15} /> Upload photo
                 </Button>

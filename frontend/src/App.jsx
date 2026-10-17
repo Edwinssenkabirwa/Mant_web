@@ -8,11 +8,13 @@ import Home from './pages/public/Home.jsx'
 import PropertiesPage from './pages/public/Properties.jsx'
 import PropertyDetail from './pages/public/PropertyDetail.jsx'
 import Services from './pages/public/Services.jsx'
+import ServiceDetail from './pages/public/ServiceDetail.jsx'
 import About from './pages/public/About.jsx'
 import Blog from './pages/public/Blog.jsx'
 import BlogPost from './pages/public/BlogPost.jsx'
 import Careers from './pages/public/Careers.jsx'
 import Contact from './pages/public/Contact.jsx'
+import NewsletterLink from './pages/public/NewsletterLink.jsx'
 import Login from './pages/auth/Login.jsx'
 import Register from './pages/auth/Register.jsx'
 import ProfilePage from './pages/account/ProfilePage.jsx'
@@ -52,11 +54,14 @@ export default function App() {
           <Route path="properties" element={<PropertiesPage />} />
           <Route path="properties/:slug" element={<PropertyDetail />} />
           <Route path="services" element={<Services />} />
+          <Route path="services/:slug" element={<ServiceDetail />} />
           <Route path="about" element={<About />} />
           <Route path="blog" element={<Blog />} />
           <Route path="blog/:slug" element={<BlogPost />} />
           <Route path="careers" element={<Careers />} />
           <Route path="contact" element={<Contact />} />
+          <Route path="newsletter/confirm" element={<NewsletterLink kind="confirm" />} />
+          <Route path="newsletter/unsubscribe" element={<NewsletterLink kind="unsubscribe" />} />
 
           <Route element={<PublicOnlyRoute />}>
             <Route path="login" element={<Login />} />

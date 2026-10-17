@@ -21,7 +21,11 @@ export default function PropertyCard({ property }) {
       <div className="property-media">
         <img
           src={mediaUrl(property.cover_image_url)}
-          alt={property.title}
+          alt={
+            property.cover_is_illustrative
+              ? `${property.title} — illustrative render, not a photograph`
+              : property.title
+          }
           loading="lazy"
           onError={(event) => {
             event.currentTarget.src = mediaUrl('')
@@ -34,6 +38,9 @@ export default function PropertyCard({ property }) {
           <span className={`badge badge-${property.status === 'AVAILABLE' ? 'ok' : 'outline'}`}>
             {property.status_display || titleCase(property.status)}
           </span>
+          {property.cover_is_illustrative ? (
+            <span className="badge badge-outline">Illustrative render</span>
+          ) : null}
         </div>
       </div>
 
