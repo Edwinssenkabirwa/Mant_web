@@ -954,6 +954,32 @@ hr {
   object-fit: contain;
 }
 
+/* What visitors actually arrive for, as four links instead of a sentence about it. */
+.hero-focus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-focus-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 17px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: rgba(6, 26, 51, 0.42);
+  color: #fff;
+  font-size: 0.93rem;
+  font-weight: 700;
+  transition: var(--transition);
+}
+
+.hero-focus-link:hover {
+  background: var(--red-600);
+  border-color: var(--red-600);
+  color: #fff;
+}
+
 .hero p {
   color: var(--navy-100);
   font-size: 1.08rem;

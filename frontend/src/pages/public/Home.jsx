@@ -40,6 +40,19 @@ export default function Home() {
 
   const heroLogo = company?.logo_url ? mediaUrl(company.logo_url, { fallback: '' }) : ''
 
+  // The wording here is ours; the destinations come from the published services, so a rename or
+  // withdrawal falls back to the services index instead of dead-ending on a slug that no longer exists.
+  const toService = (name) => {
+    const match = (services.data ?? []).find((row) => row.name.toLowerCase() === name.toLowerCase())
+    return match ? `/services/${match.slug}` : '/services'
+  }
+  const heroLinks = [
+    { label: 'Rent collection', to: '/properties?listing_type=RENT' },
+    { label: 'Property management', to: toService('Property Management') },
+    { label: 'Contacting & lobbying', to: toService('Lobbying & Advocacy') },
+    { label: 'Debt recovery', to: toService('Debt Recovery') },
+  ]
+
   const runSearch = (event) => {
     event.preventDefault()
     const params = new URLSearchParams()
@@ -78,9 +91,13 @@ export default function Home() {
                   'Bridging gaps. Building value.'
                 )}
               </h1>
-              <p>
-                We connect people to possibilities by managing properties with excellence, creating value that lasts.
-              </p>
+              <div className="hero-focus">
+                {heroLinks.map((item) => (
+                  <Link key={item.label} to={item.to} className="hero-focus-link">
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
               {/*<p>
                 Mant Bridges LTD lists property for rent and sale across Uganda and runs the administration behind it —
                 leases, invoices, payment reconciliation and receipts on one set of books.
