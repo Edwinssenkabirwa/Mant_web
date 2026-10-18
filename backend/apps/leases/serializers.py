@@ -30,6 +30,7 @@ class LeaseSerializer(serializers.ModelSerializer):
     tenant_name = serializers.CharField(source="tenant.full_name", read_only=True)
     landlord_name = serializers.CharField(source="landlord.full_name", read_only=True)
     property_title = serializers.CharField(source="property.title", read_only=True)
+    property_slug = serializers.CharField(source="property.slug", read_only=True, default="")
 
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     frequency_display = serializers.CharField(
@@ -49,7 +50,7 @@ class LeaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lease
         fields = [
-            "id", "number", "property", "property_detail", "property_title",
+            "id", "number", "property", "property_detail", "property_title", "property_slug",
             "tenant", "tenant_detail", "tenant_name",
             "landlord", "landlord_detail", "landlord_name",
             "start_date", "end_date", "monthly_rent", "monthly_rent_display",

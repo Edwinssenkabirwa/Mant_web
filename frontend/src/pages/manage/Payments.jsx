@@ -22,6 +22,7 @@ import { Field, Input, SearchBar, SelectOptions } from '../../components/ui/Form
 import { Modal } from '../../components/ui/Modal.jsx'
 import { Pagination } from '../../components/ui/Pagination.jsx'
 import { Td, Table } from '../../components/ui/Table.jsx'
+import PropertyLink from '../../components/properties/PropertyLink.jsx'
 import { dateLabel, money } from '../../utils/format.js'
 
 /**
@@ -234,7 +235,11 @@ export default function Payments({ portal = false }) {
                   <span className="muted">No invoice linked</span>
                 )}
               </Td>
-              {portal ? null : <Td className="truncate">{payment.property_title}</Td>}
+              {portal ? null : (
+                <Td className="truncate">
+                  <PropertyLink slug={payment.property_slug} title={payment.property_title} />
+                </Td>
+              )}
               <Td num className="bold">
                 {payment.amount_display}
               </Td>

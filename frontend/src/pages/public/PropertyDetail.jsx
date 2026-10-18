@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Car,
   Check,
+  Handshake,
   MapPin,
   Ruler,
   ShieldCheck,
@@ -48,6 +49,7 @@ export default function PropertyDetail() {
   const similarRows = (similar.data?.results || similar.data || [])
     .filter((item) => item.id !== property?.id)
     .slice(0, 3)
+  const locationParts = [property?.address, property?.district, property?.city, property?.region].filter(Boolean)
 
   if (request.loading && !property) return <div className="container section"><Loading label="Loading listing…" /></div>
   if (request.error) {
@@ -94,8 +96,20 @@ export default function PropertyDetail() {
         <h1 className="page-title">{property.title}</h1>
         <p className="location-line" style={{ fontSize: '.95rem' }}>
           <MapPin size={15} />
-          {[property.address, property.district, property.city, property.region].filter(Boolean).join(', ') ||
-            'Location on request'}
+          {locationParts.length ? (
+            locationParts.map((part, index) => (
+              <span key={`${part}-${index}`}>
+                {part === property.city ? (
+                  <Link to={`/properties?city=${encodeURIComponent(part)}`}>{part}</Link>
+                ) : (
+                  part
+                )}
+                {index < locationParts.length - 1 ? ', ' : null}
+              </span>
+            ))
+          ) : (
+            'Location on request'
+          )}
         </p>
         <p className="property-price" style={{ fontSize: '1.6rem' }}>
           {property.price_display || 'Price on request'}
@@ -227,6 +241,9 @@ export default function PropertyDetail() {
               </p>
               <Button to="/contact" variant="outline" block>
                 Contact the office
+              </Button>
+              <Button to="/services" variant="ghost" block>
+                <Handshake size={16} /> What we do for landlords and tenants
               </Button>
               <Button to="/properties" variant="ghost" block>
                 <ArrowLeft size={16} /> Back to listings

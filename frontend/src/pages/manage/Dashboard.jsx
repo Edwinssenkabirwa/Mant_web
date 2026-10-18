@@ -30,6 +30,7 @@ import { Callout, KeyValue, PageHeader, Panel, Stat, StatGrid } from '../../comp
 import { Button } from '../../components/ui/Button.jsx'
 import { ErrorState, Loading } from '../../components/ui/Feedback.jsx'
 import { Td, Table } from '../../components/ui/Table.jsx'
+import PropertyLink from '../../components/properties/PropertyLink.jsx'
 import { dateTimeLabel, money, percent } from '../../utils/format.js'
 import { useAction } from '../../hooks/useAction.js'
 import { useToast } from '../../context/ToastContext.jsx'
@@ -109,10 +110,12 @@ export default function Dashboard() {
           value={money(totals.invoiced, currency)}
           foot={`${(totals.invoices ?? 0).toLocaleString()} invoices`}
           icon={CircleDollarSign}
+          to="/manage/invoices"
         />
         <Stat
           label="Collected"
           value={money(totals.collected, currency)}
+          to="/manage/reports"
           foot={
             <ProgressBar
               value={totals.collection_rate ?? 0}
@@ -127,12 +130,14 @@ export default function Dashboard() {
           foot={money(totals.overdue, currency) + ' past due date'}
           tone="warn"
           icon={AlertTriangle}
+          to="/manage/invoices?outstanding=true"
         />
         <Stat
           label="Pending payments"
           value={(totals.pending_payments ?? 0).toLocaleString()}
           foot="Awaiting confirmation"
           icon={Wallet}
+          to="/manage/payments"
         />
       </StatGrid>
 
@@ -238,7 +243,9 @@ export default function Dashboard() {
                 </Link>
               </Td>
               <Td>{invoice.tenant_name}</Td>
-              <Td className="truncate">{invoice.property_title}</Td>
+              <Td className="truncate">
+                <PropertyLink slug={invoice.property_slug} title={invoice.property_title} />
+              </Td>
               <Td>{invoice.period_label}</Td>
               <Td num>{invoice.balance_display ?? money(invoice.balance, currency)}</Td>
               <Td>
@@ -332,7 +339,13 @@ export default function Dashboard() {
                     </span>
                   </Td>
                   <Td className="truncate">{enquiry.subject || '—'}</Td>
-                  <Td className="truncate">{enquiry.property_title || 'General'}</Td>
+                  <Td className="truncate">
+                    <PropertyLink
+                      slug={enquiry.property_slug}
+                      title={enquiry.property_title}
+                      fallback="General"
+                    />
+                  </Td>
                   <Td className="tiny">{dateTimeLabel(enquiry.created_at)}</Td>
                   <Td>
                     <StatusBadge value={enquiry.status} label={enquiry.status_display} />

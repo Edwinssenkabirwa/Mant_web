@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ExternalLink, Mail, Phone, Trash2 } from 'lucide-react'
+import { Mail, Phone, Trash2 } from 'lucide-react'
 import { deleteEnquiry, enquiryStats, listEnquiries, patchEnquiry } from '../../api/site.js'
 import { hasActiveFilters, useList } from '../../hooks/useList.js'
 import { useApi } from '../../hooks/useApi.js'
@@ -13,6 +13,7 @@ import { Field, Input, SearchBar, SelectOptions } from '../../components/ui/Form
 import { ConfirmDialog, Modal } from '../../components/ui/Modal.jsx'
 import { Pagination } from '../../components/ui/Pagination.jsx'
 import { Td, Table } from '../../components/ui/Table.jsx'
+import PropertyLink from '../../components/properties/PropertyLink.jsx'
 import { dateTimeLabel } from '../../utils/format.js'
 
 const STATUSES = [
@@ -208,24 +209,11 @@ export default function Enquiries() {
                 ) : null}
               </Td>
               <Td className="tiny">
-                {row.property_title ? (
-                  row.property_slug ? (
-                    <a
-                      href={`/properties/${row.property_slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="row"
-                      style={{ gap: 4 }}
-                    >
-                      <span className="truncate">{row.property_title}</span>
-                      <ExternalLink size={12} />
-                    </a>
-                  ) : (
-                    row.property_title
-                  )
-                ) : (
-                  <span className="muted">General</span>
-                )}
+                <PropertyLink
+                  slug={row.property_slug}
+                  title={row.property_title}
+                  fallback={<span className="muted">General</span>}
+                />
               </Td>
               <Td className="tiny">{dateTimeLabel(row.created_at)}</Td>
               <Td className="tiny">{row.handled_by_name || 'Unassigned'}</Td>

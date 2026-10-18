@@ -27,7 +27,7 @@ import { useApi } from '../../hooks/useApi.js'
 import { mediaUrl } from '../../utils/media.js'
 
 export default function Home() {
-  const { options } = useLookups()
+  const { options, company } = useLookups()
   const navigate = useNavigate()
   const [search, setSearch] = useState({ listing_type: '', property_type: '', city: '' })
   const [heroImage, setHeroImage] = useState('loading')
@@ -37,6 +37,8 @@ export default function Home() {
   const posts = useApi(() => latestPosts(), [])
   const services = useApi(() => collect(listServices, {}, 3), [])
   const popular = useApi(() => listProperties({ listing_type: 'SALE', ordering: '-created_at' }), [])
+
+  const heroLogo = company?.logo_url ? mediaUrl(company.logo_url, { fallback: '' }) : ''
 
   const runSearch = (event) => {
     event.preventDefault()
@@ -65,14 +67,24 @@ export default function Home() {
               <p className="eyebrow" style={{ color: '#ffb3bd' }}>
                 Kampala · Uganda
               </p>
-              <h1>Bridging gaps. Building value.</h1>
+              <h1 className="hero-logo">
+                {heroLogo ? (
+                  <img
+                    src={heroLogo}
+                    alt={`${company?.name || 'Mant Bridges LTD'} — Bridging gaps. Building value.`}
+                    fetchPriority="high"
+                  />
+                ) : (
+                  'Bridging gaps. Building value.'
+                )}
+              </h1>
               <p>
                 We connect people to possibilities by managing properties with excellence, creating value that lasts.
               </p>
-              <p>
+              {/*<p>
                 Mant Bridges LTD lists property for rent and sale across Uganda and runs the administration behind it —
                 leases, invoices, payment reconciliation and receipts on one set of books.
-              </p>
+              </p>*/}
               <div className="hero-mission">Your property. Our priority. Your success. Our mission.</div>
               <div className="row" style={{ gap: 12 }}>
                 <Button to="/properties" variant="accent" size="lg">
@@ -84,22 +96,22 @@ export default function Home() {
               </div>
               {stats.data ? (
                 <div className="hero-stats">
-                  <div>
+                  <Link to="/properties">
                     <div className="hero-stat-value">{stats.data.available}</div>
                     <div className="hero-stat-label">Listings available</div>
-                  </div>
-                  <div>
+                  </Link>
+                  <Link to="/properties?listing_type=RENT">
                     <div className="hero-stat-value">{stats.data.for_rent}</div>
                     <div className="hero-stat-label">For rent</div>
-                  </div>
-                  <div>
+                  </Link>
+                  <Link to="/properties?listing_type=SALE">
                     <div className="hero-stat-value">{stats.data.for_sale}</div>
                     <div className="hero-stat-label">For sale</div>
-                  </div>
-                  <div>
+                  </Link>
+                  <Link to="/about#locations">
                     <div className="hero-stat-value">{stats.data.cities}</div>
                     <div className="hero-stat-label">Locations covered</div>
-                  </div>
+                  </Link>
                 </div>
               ) : null}
             </div>
@@ -141,7 +153,7 @@ export default function Home() {
                   ))}
                 </datalist>
               </Field>
-              <Button type="submit" block size="lg">
+              <Button type="submit" block size="lg" variant="accent">
                 <Search size={17} /> Search property
               </Button>
               <p className="hint" style={{ margin: 0 }}>
@@ -156,13 +168,13 @@ export default function Home() {
         <span className="arc-swoosh" aria-hidden="true" />
       </section>
 
-      <section className="section" style={{ background: 'var(--surface)' }}>
+      <section className="section section-wash">
         <div className="container stack">
           <div className="section-head">
             <div>
-              <p className="eyebrow">Our services</p>
-              <h2>Comprehensive. Professional. Results Driven.</h2>
-              <p>Written mandates, dated records and reporting on a calendar — for the property you already own.</p>
+              {/*<p className="eyebrow">Our services</p>*/}
+              <h2>Our Services</h2>
+              {/*<p>Written mandates, dated records and reporting on a calendar — </p>*/}
             </div>
             <Button to="/services" variant="outline">
               Service details <ArrowRight size={16} />
@@ -180,23 +192,15 @@ export default function Home() {
           ) : (
             <div className="grid grid-4">
               {services.data.slice(0, 4).map((service) => (
-                <article className="card" key={service.id}>
-                  {service.image_url ? (
-                    <img
-                      className="service-card-image"
-                      src={mediaUrl(service.image_url)}
-                      alt={service.image_alt || service.name}
-                      loading="lazy"
-                      onError={(event) => {
-                        event.currentTarget.src = mediaUrl('')
-                      }}
-                    />
-                  ) : null}
-                  <div className="card-body stack">
+                <article className="card service-card" key={service.id}>
+                  <div className="card-body">
                     <div className="row" style={{ gap: 11, alignItems: 'center' }}>
                       <ServiceBadge icon={service.icon} />
-                      <h3 style={{ marginBottom: 0 }}>{service.name}</h3>
+                      <h3>
+                        <Link to={`/services/${service.slug}`}>{service.name}</Link>
+                      </h3>
                     </div>
+                    <span className="flyer-dash" aria-hidden="true" />
                     <p className="muted" style={{ margin: 0 }}>
                       {service.summary_text}
                     </p>
@@ -208,6 +212,18 @@ export default function Home() {
                       How it works <ArrowRight size={15} />
                     </Link>
                   </div>
+                  {service.image_url ? (
+                    <Link className="service-card-photo" to={`/services/${service.slug}`}>
+                      <img
+                        src={mediaUrl(service.image_url)}
+                        alt={service.image_alt || service.name}
+                        loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.src = mediaUrl('')
+                        }}
+                      />
+                    </Link>
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -240,7 +256,7 @@ export default function Home() {
       </section>
 
       {stats.data?.by_type?.some((row) => row.count > 0) ? (
-        <section className="section">
+        <section className="section section-wash">
           <div className="container stack">
             <div className="section-head">
               <div>
@@ -329,7 +345,7 @@ export default function Home() {
 
       <NewsletterSignup variant="band" source="homepage" />
 
-      <section className="section" style={{ background: 'var(--surface)' }}>
+      <section className="section section-wash">
         <div className="container stack">
           <div className="section-head">
             <div>

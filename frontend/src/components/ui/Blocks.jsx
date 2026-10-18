@@ -31,16 +31,24 @@ export function FlatPanel({ title, action, children, className = '' }) {
   )
 }
 
-export function Stat({ label, value, foot, tone, icon: Icon }) {
-  return (
-    <div className={`stat${tone ? ` stat-${tone}` : ''}`}>
+export function Stat({ label, value, foot, tone, icon: Icon, to }) {
+  const className = `stat${tone ? ` stat-${tone}` : ''}${to ? ' stat-link' : ''}`
+  const body = (
+    <>
       <span className="stat-label">
         {Icon ? <Icon size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 5 }} /> : null}
         {label}
       </span>
       <strong className="stat-value">{value}</strong>
       {foot ? <span className="stat-foot">{foot}</span> : null}
-    </div>
+    </>
+  )
+  return to ? (
+    <Link to={to} className={className}>
+      {body}
+    </Link>
+  ) : (
+    <div className={className}>{body}</div>
   )
 }
 

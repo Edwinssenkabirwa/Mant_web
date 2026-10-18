@@ -200,6 +200,17 @@ export default function ManagePosts() {
                         Featured
                       </span>
                     ) : null}
+                    {post.status === 'PUBLISHED' ? (
+                      <a
+                        href={`/blog/${post.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="property-link tiny"
+                        style={{ marginLeft: 6 }}
+                      >
+                        on the site <ExternalLink size={11} />
+                      </a>
+                    ) : null}
                     <span className="tiny muted" style={{ display: 'block' }}>
                       {post.excerpt_text || 'No excerpt'}
                     </span>

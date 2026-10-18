@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom'
 import { Handshake, ShieldCheck, TrendingUp, Users } from 'lucide-react'
+import { listServices } from '../../api/services.js'
+import { collect } from '../../api/paginate.js'
 import EnquiryForm from '../../components/properties/EnquiryForm.jsx'
 import { Breadcrumb, Callout, PageHeader, Panel } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
+import { useApi } from '../../hooks/useApi.js'
 
 /**
  * The backend has no JobVacancy model, no applicant record and no CV upload
@@ -35,6 +38,11 @@ const AREAS = [
 ]
 
 export default function Careers() {
+  // Matched by name against the published offers, so a renamed service simply stops linking.
+  const services = useApi(() => collect(listServices, {}, 2), [])
+  const slugFor = (name) =>
+    (services.data ?? []).find((service) => service.name.toLowerCase() === name.toLowerCase())?.slug
+
   return (
     <div className="container section-tight stack">
       <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'Careers' }]} />
@@ -62,7 +70,13 @@ export default function Careers() {
                     <area.icon size={18} />
                   </div>
                   <div>
-                    <h4>{area.title}</h4>
+                    <h4>
+                      {slugFor(area.title) ? (
+                        <Link to={`/services/${slugFor(area.title)}`}>{area.title}</Link>
+                      ) : (
+                        area.title
+                      )}
+                    </h4>
                     <p>{area.body}</p>
                   </div>
                 </div>

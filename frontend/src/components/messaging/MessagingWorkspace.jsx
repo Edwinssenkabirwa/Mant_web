@@ -21,6 +21,7 @@ import { StatusBadge } from '../ui/Badge.jsx'
 import { EmptyState, ErrorState, Loading, RowsSkeleton } from '../ui/Feedback.jsx'
 import { Field, Input, SearchBar, SelectOptions } from '../ui/Form.jsx'
 import NewConversationModal from './NewConversationModal.jsx'
+import PropertyLink from '../properties/PropertyLink.jsx'
 
 const CATEGORIES = [
   { value: 'GENERAL', label: 'General' },
@@ -242,7 +243,15 @@ export default function MessagingWorkspace({ allowScopeAll = false, onActivity }
                   </div>
                   <p className="hint" style={{ margin: '4px 0 0' }}>
                     With {selected.counterpart?.full_name || '—'}
-                    {selected.property_title ? ` · ${selected.property_title}` : ''}
+                    {selected.property_title ? ' · ' : null}
+                    {isAdmin ? (
+                      <PropertyLink
+                        slug={selected.property_slug}
+                        title={selected.property_title}
+                      />
+                    ) : (
+                      selected.property_title || null
+                    )}
                     {selected.lease_number ? ` · Lease ${selected.lease_number}` : ''}
                   </p>
                 </div>

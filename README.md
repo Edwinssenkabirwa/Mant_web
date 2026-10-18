@@ -58,6 +58,14 @@ to its own icon set, so a value outside the list renders no badge. Migration `co
 five rows seeded before the brochures into these four; the withdrawn "Land documentation" row keeps
 its text and artwork and is only unpublished.
 
+The picture and the badge under each offer follow the portrait flyer: building / keys / landmark /
+coins, over an apartment block, a glass office, a handshake in front of a government dome and a
+gavel on law books. Those four files in `backend/seed_images/services/` are AI renders matched to
+the flyer's photographs, not crops of it — the shared flyer is 904×1280, so each of its service
+pictures is only about 200×110 px and would not survive the banner on the service page. They are
+labelled illustrative in `Service.image_alt`. Migration `core.0007` moved the Debt Recovery badge
+from a gavel to the money disc the flyer draws.
+
 ### `backend/.env`
 
 | Variable | Purpose |
@@ -263,8 +271,9 @@ in-memory backend and assert on `mail.outbox`.
 
 ## Verification status
 
-`npm run build` → `✓ 2086 modules transformed`, `dist/assets/index-*.js` 571 kB (gzip 162 kB),
-`✓ built in 6.2s`. `python manage.py test` → **Ran 57 tests … OK** (91 s; system check reported no
+`npm run build` → `✓ 2087 modules transformed`, `dist/assets/index-*.js` 572.54 kB (gzip 162 kB),
+`dist/assets/index-*.css` 42.31 kB, `✓ built in 4.2s`. `python manage.py test` → **Ran 57 tests … OK**
+(44 s; system check reported no
 issues). All 57 live in `apps/core/tests.py`: 13 services and seeding, 12 newsletter double opt-in,
 17 campaign engine, 15 admin email API. The campaign tests run on a throw-away database with Django's
 in-memory email backend — nothing in the suite can reach a real mailbox, and `db.sqlite3` is not
@@ -277,6 +286,18 @@ withdrawn `land-documentation` slug returns 404 rather than a half-rendered page
 carries all three published phone numbers with the Cham Towers address. No blog post or email
 template linked an old service slug, so nothing internal broke; links shared outside the site would
 need updating.
+
+Every surface that names a listing or a service now links somewhere real. Admin and staff tables
+(dashboard, leases, invoices, payments, receipts, enquiries, messaging header) render the property
+name through `components/properties/PropertyLink.jsx`, which opens the published listing page in a new
+tab and falls back to plain text when the API returns no slug — that required adding `property_slug`
+to `LeaseSerializer`, `PaymentSerializer`, `ReceiptSerializer` and `ConversationSerializer`, following
+the field `InvoiceSerializer` already exposed. Publicly, the hero and About counters link to filtered
+listing searches, the service cards and services index titles link to `/services/<slug>`, Careers
+matches its four practice areas by name against `/api/services/` rather than hardcoding slugs, and a
+listing page links its own city to `/properties?city=…`. Deliberate exceptions: the tenant portal keeps
+property names as text (`InvoiceDetail.jsx` already routes tenants to `/portal/leases`), and property
+names inside `<option>` labels in Reports and the invoice modal cannot be links.
 
 The dashboard, portal and public pages were exercised in a real browser against the running API:
 sign-in as each role, property create/edit with photo upload and cover switch, lease create and

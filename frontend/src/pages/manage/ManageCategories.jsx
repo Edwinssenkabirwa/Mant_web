@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
 import { createCategory, deleteCategory, manageCategories, updateCategory } from '../../api/blog.js'
 import { collect } from '../../api/paginate.js'
 import { useApi } from '../../hooks/useApi.js'
@@ -109,9 +109,15 @@ export default function ManageCategories() {
                   <div className="row" style={{ gap: 8 }}>
                     <strong>{category.name}</strong>
                     <span className="badge badge-outline">{category.slug}</span>
-                    <span className="tiny muted">
+                    <a
+                      className="tiny muted property-link"
+                      href={`/blog?category=${category.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       {pluralize(category.post_count ?? 0, 'article')}
-                    </span>
+                      <ExternalLink size={11} />
+                    </a>
                   </div>
                   {category.description ? (
                     <p className="muted small" style={{ margin: '4px 0 0' }}>

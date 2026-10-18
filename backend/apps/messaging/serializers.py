@@ -54,6 +54,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     property_title = serializers.CharField(source="property.title", read_only=True, default="")
+    property_slug = serializers.CharField(source="property.slug", read_only=True, default="")
     lease_number = serializers.CharField(source="lease.number", read_only=True, default="")
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     category_display = serializers.CharField(source="get_category_display", read_only=True)
@@ -63,7 +64,7 @@ class ConversationSerializer(serializers.ModelSerializer):
         fields = [
             "id", "subject", "category", "category_display", "status", "status_display",
             "created_by", "created_by_name", "participants_detail", "counterpart",
-            "property", "property_title", "lease", "lease_number",
+            "property", "property_title", "property_slug", "lease", "lease_number",
             "unread_count", "message_count", "last_message",
             "last_message_at", "closed_at", "created_at",
         ]

@@ -23,6 +23,7 @@ import { Input, SearchBar, SelectOptions } from '../../components/ui/Form.jsx'
 import { ConfirmDialog } from '../../components/ui/Modal.jsx'
 import { Pagination } from '../../components/ui/Pagination.jsx'
 import { Td, Table } from '../../components/ui/Table.jsx'
+import PropertyLink from '../../components/properties/PropertyLink.jsx'
 import { dateLabel, money } from '../../utils/format.js'
 
 const FILTER_KEYS = ['q', 'status', 'outstanding', 'overdue', 'lease', 'tenant', 'property', 'year', 'ordering']
@@ -213,7 +214,13 @@ export default function Invoices({ portal = false }) {
                   </span>
                 </Td>
               )}
-              <Td className="truncate">{invoice.property_title}</Td>
+              <Td className="truncate">
+                {portal ? (
+                  invoice.property_title
+                ) : (
+                  <PropertyLink slug={invoice.property_slug} title={invoice.property_title} />
+                )}
+              </Td>
               <Td className="tiny">{invoice.period_label}</Td>
               <Td className="tiny">
                 {dateLabel(invoice.due_date)}

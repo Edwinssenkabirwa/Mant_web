@@ -198,6 +198,17 @@ export default function Properties() {
                     <Link to={`/manage/properties/${property.id}/edit`} className="bold">
                       {property.title}
                     </Link>
+                    {property.is_published ? (
+                      <a
+                        href={`/properties/${property.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="property-link tiny"
+                        style={{ display: 'inline-flex', marginLeft: 6 }}
+                      >
+                        on the site <ExternalLink size={11} />
+                      </a>
+                    ) : null}
                     <span className="tiny muted" style={{ display: 'block' }}>
                       {property.reference || property.slug} · added {dateLabel(property.created_at)}
                       {property.is_featured ? ' · featured' : ''}

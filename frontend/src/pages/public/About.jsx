@@ -133,9 +133,9 @@ export default function About() {
                   ) : null}
                   {stats.data ? (
                     <>
-                      <Stat label="Available listings" value={stats.data.available} />
-                      <Stat label="For rent" value={stats.data.for_rent} />
-                      <Stat label="For sale" value={stats.data.for_sale} />
+                      <Stat label="Available listings" value={stats.data.available} to="/properties" />
+                      <Stat label="For rent" value={stats.data.for_rent} to="/properties?listing_type=RENT" />
+                      <Stat label="For sale" value={stats.data.for_sale} to="/properties?listing_type=SALE" />
                       <Stat label="Locations" value={stats.data.cities} />
                     </>
                   ) : null}
@@ -143,7 +143,7 @@ export default function About() {
               </div>
 
               {cities.data?.length ? (
-                <div className="card">
+                <div className="card" id="locations" style={{ scrollMarginTop: 90 }}>
                   <div className="card-head">
                     <h3>Where we list</h3>
                   </div>
@@ -192,7 +192,7 @@ export default function About() {
         <span className="arc-swoosh" aria-hidden="true" />
       </section>
 
-      <section className="section" style={{ background: 'var(--surface)' }}>
+      <section className="section section-wash">
         <div className="container stack">
           <div className="section-head">
             <div>

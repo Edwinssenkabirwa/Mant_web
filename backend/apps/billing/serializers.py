@@ -163,6 +163,8 @@ class PaymentSerializer(serializers.ModelSerializer):
     lease_number = serializers.CharField(source="lease.number", read_only=True, default="")
     property_title = serializers.CharField(source="invoice.property.title", read_only=True,
                                            default="")
+    property_slug = serializers.CharField(source="invoice.property.slug", read_only=True,
+                                          default="")
     recorded_by_name = serializers.CharField(source="recorded_by.full_name", read_only=True,
                                              default="")
     confirmed_by_name = serializers.CharField(source="confirmed_by.full_name", read_only=True,
@@ -176,7 +178,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = [
             "id", "number", "invoice", "invoice_detail", "lease", "lease_number",
-            "property_title", "tenant", "tenant_detail", "tenant_name", "payer_name",
+            "property_title", "property_slug", "tenant", "tenant_detail", "tenant_name", "payer_name",
             "amount", "amount_display", "currency", "method", "method_display",
             "reference", "paid_on", "status", "status_display", "notes",
             "rejection_reason", "recorded_by", "recorded_by_name", "confirmed_by_name",
@@ -274,6 +276,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
     pdf_url = serializers.SerializerMethodField()
     tenant_name = serializers.CharField(source="tenant.full_name", read_only=True)
     property_title = serializers.CharField(source="property.title", read_only=True, default="")
+    property_slug = serializers.CharField(source="property.slug", read_only=True, default="")
     lease_number = serializers.CharField(source="lease.number", read_only=True, default="")
     payment_number = serializers.CharField(source="payment.number", read_only=True)
     method_display = serializers.CharField(source="get_method_display", read_only=True)
@@ -287,7 +290,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
         model = Receipt
         fields = [
             "id", "number", "payment", "payment_number", "invoice_number", "lease",
-            "lease_number", "property", "property_title", "tenant", "tenant_name",
+            "lease_number", "property", "property_title", "property_slug", "tenant", "tenant_name",
             "amount", "amount_display", "currency", "method", "method_display",
             "reference", "paid_on", "issued_by_name", "pdf_url", "notes",
             "is_void", "void_reason", "voided_at", "created_at",

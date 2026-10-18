@@ -13,6 +13,7 @@ import { Field, Input, SearchBar, SelectOptions } from '../../components/ui/Form
 import { Modal } from '../../components/ui/Modal.jsx'
 import { Pagination } from '../../components/ui/Pagination.jsx'
 import { Td, Table } from '../../components/ui/Table.jsx'
+import PropertyLink from '../../components/properties/PropertyLink.jsx'
 import { dateLabel } from '../../utils/format.js'
 
 const ORDERING = [
@@ -165,7 +166,17 @@ export default function Receipts({ portal = false }) {
                 </span>
               </Td>
               {portal ? null : <Td className="truncate">{receipt.tenant_name}</Td>}
-              <Td className="truncate">{receipt.property_title || '—'}</Td>
+              <Td className="truncate">
+                {portal ? (
+                  receipt.property_title || '—'
+                ) : (
+                  <PropertyLink
+                    slug={receipt.property_slug}
+                    title={receipt.property_title}
+                    fallback="—"
+                  />
+                )}
+              </Td>
               <Td>
                 <span className="semi">{receipt.invoice_number || '—'}</span>
                 {receipt.lease_number ? (

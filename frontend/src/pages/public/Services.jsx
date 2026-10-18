@@ -92,7 +92,11 @@ export default function Services() {
               <div className="card-body stack">
                 <div className="row" style={{ gap: 13, alignItems: 'center' }}>
                   <ServiceBadge icon={service.icon} />
-                  <h2 style={{ margin: 0, color: '#fff' }}>{service.name}</h2>
+                  <h2 style={{ margin: 0, color: '#fff' }}>
+                    <Link to={`/services/${service.slug}`} style={{ color: 'inherit' }}>
+                      {service.name}
+                    </Link>
+                  </h2>
                 </div>
                 <p className="lead" style={{ margin: 0, color: 'var(--navy-100)' }}>
                   {service.summary_text}

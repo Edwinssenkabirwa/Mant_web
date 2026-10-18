@@ -60,7 +60,7 @@ SERVICES = [
             "reconciles them. Licensed trades are engaged for the work that requires them, "
             "and we do not claim credentials we do not hold."
         ),
-        "image_alt": "Rent ledger and property administration desk",
+        "image_alt": "Illustrative artwork — apartment blocks with a landscaped frontage",
     },
     {
         "name": "Real Estate Management",
@@ -99,7 +99,7 @@ SERVICES = [
             "and timeline depend on the market, and the legal transfer must be handled by a "
             "licensed advocate."
         ),
-        "image_alt": "Property sale agreement and handover of keys",
+        "image_alt": "Illustrative artwork — glass-fronted office building",
     },
     {
         "name": "Lobbying & Advocacy",
@@ -142,12 +142,12 @@ SERVICES = [
             "office and a licensed advocate. We prepare the file and follow it up; we cannot "
             "guarantee what an office decides or how long it takes."
         ),
-        "image_alt": "Representation file, permits and land office correspondence",
+        "image_alt": "Illustrative artwork — handshake in front of a government building",
     },
     {
         "name": "Debt Recovery",
         "category": Service.Category.DEBT_RECOVERY,
-        "icon": Service.Icon.GAVEL,
+        "icon": Service.Icon.COINS,
         "summary": (
             "We recover what is rightfully yours. Our effective and ethical debt recovery "
             "solutions help you improve cash flow and protect your assets."
@@ -176,7 +176,7 @@ SERVICES = [
             "and the process your agreement and Ugandan law allow — we will not promise a "
             "result we cannot control."
         ),
-        "image_alt": "Arrears review and written recovery correspondence",
+        "image_alt": "Illustrative artwork — gavel resting on law books",
     },
 ]
 
