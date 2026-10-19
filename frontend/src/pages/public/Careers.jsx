@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Handshake, ShieldCheck, TrendingUp, Users } from 'lucide-react'
+import { HandCoins, Handshake, ShieldCheck, TrendingUp, Users } from 'lucide-react'
 import { listServices } from '../../api/services.js'
 import { collect } from '../../api/paginate.js'
 import EnquiryForm from '../../components/properties/EnquiryForm.jsx'
@@ -14,34 +14,45 @@ import { useApi } from '../../hooks/useApi.js'
  * honestly. See BACKEND_FOLLOWUPS.md for the endpoints needed to turn this into
  * a real careers page.
  */
+// Carries the service slug, not just its name: the published names are editable in the
+// dashboard, but the slugs the service pages are served from are pinned in the seeder.
 const AREAS = [
   {
     icon: Users,
-    title: 'Property management',
-    body: 'Portfolio visits, tenant onboarding, maintenance follow-up and landlord reporting across Kampala and Wakiso.',
+    slug: 'property-management',
+    title: 'Rent collection & property management',
+    body: 'Portfolio visits, tenant onboarding, maintenance follow-up and landlord reporting across Kampala, Wakiso, Mukono, Masaka and the major cities of Uganda.',
   },
   {
     icon: TrendingUp,
-    title: 'Real estate management',
+    slug: 'real-estate-management',
+    title: 'Real estate',
     body: 'Listings, viewing records, offer negotiation and the paperwork between the first offer and handover.',
   },
   {
-    icon: ShieldCheck,
-    title: 'Debt recovery',
-    body: 'Documented demand, negotiation and escalation. We recover what is owed without harassment or over-promising.',
+    icon: Handshake,
+    slug: 'lobbying-and-advocacy',
+    title: 'Contracting & lobbying',
+    body: 'Representation with authorities, utilities and the land office, and the files those offices expect.',
   },
   {
-    icon: Handshake,
-    title: 'Lobbying & advocacy',
-    body: 'Representation with authorities, utilities and the land office, and the files those offices expect.',
+    icon: ShieldCheck,
+    slug: 'land-documentation',
+    title: 'Land & property documentation',
+    body: 'Searches, filings and follow-ups on sale agreements, succession files and land records.',
+  },
+  {
+    icon: HandCoins,
+    slug: 'debt-recovery',
+    title: 'Debt recovery',
+    body: 'Documented demand, negotiation and escalation. We recover what is owed without harassment or over-promising.',
   },
 ]
 
 export default function Careers() {
-  // Matched by name against the published offers, so a renamed service simply stops linking.
+  // The published service supplies the current name, so a rename in the dashboard is reflected here.
   const services = useApi(() => collect(listServices, {}, 2), [])
-  const slugFor = (name) =>
-    (services.data ?? []).find((service) => service.name.toLowerCase() === name.toLowerCase())?.slug
+  const serviceFor = (slug) => (services.data ?? []).find((service) => service.slug === slug)
 
   return (
     <div className="container section-tight stack">
@@ -50,7 +61,7 @@ export default function Careers() {
       <PageHeader
         eyebrow="Work with us"
         title="Careers at Mant Bridges LTD"
-        lead="We are a small team in Kampala running property management, real estate management, lobbying and advocacy, and debt recovery. We hire when the work needs another pair of hands, and we say so plainly rather than keeping a permanent advert running."
+        lead="We are a professional, committed and organised team dealing in rent collection and property management, real estate, contracting and lobbying, land and property documentation, and debt recovery, located in Kampala. We offer employment when need arises and we advertise here when there is a vacancy."
       />
 
       <div className="split">
@@ -71,8 +82,8 @@ export default function Careers() {
                   </div>
                   <div>
                     <h4>
-                      {slugFor(area.title) ? (
-                        <Link to={`/services/${slugFor(area.title)}`}>{area.title}</Link>
+                      {serviceFor(area.slug) ? (
+                        <Link to={`/services/${area.slug}`}>{serviceFor(area.slug).name}</Link>
                       ) : (
                         area.title
                       )}
@@ -85,6 +96,15 @@ export default function Careers() {
           </section>
 
           <section className="stack stack-sm">
+            <h2>How to apply</h2>
+            <ul className="bullets">
+              <li>Contact the company through the company phone numbers and platforms.</li>
+              <li>Send an inquiry via email or by filling in the form on the left of this page.</li>
+              <li>Lastly, the company gets back to you.</li>
+            </ul>
+          </section>
+
+          <section className="stack stack-sm">
             <h2>How hiring works here</h2>
             <ol className="steps">
               <li>Send an enquiry with your background and the area you want to work in.</li>
@@ -92,16 +112,6 @@ export default function Careers() {
               <li>A practical session on our books and systems, then a conversation about terms.</li>
               <li>Contract and start date agreed in writing before any work begins.</li>
             </ol>
-          </section>
-
-          <section className="stack stack-sm">
-            <h2>What we expect</h2>
-            <ul className="bullets">
-              <li>Honesty about figures. Rent records, balances and receipts have to be right.</li>
-              <li>Written follow-through — every commitment to a client gets a thread or a document.</li>
-              <li>Respect for tenants and landlords alike, including when money is late.</li>
-              <li>Comfort with Ugandan practice: mobile money reconciliation, bank slips, KRA/URA-grade paperwork.</li>
-            </ul>
           </section>
 
           <Callout tone="navy">

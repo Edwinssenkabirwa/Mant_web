@@ -47,7 +47,9 @@ export default function PropertyCard({ property }) {
       <div className="property-body">
         <p className="property-price">{property.price_display || 'Price on request'}</p>
         <h3 className="property-title">
-          <Link to={`/properties/${property.slug}`}>{property.title}</Link>
+          <Link className="stretched-link" to={`/properties/${property.slug}`}>
+            {property.title}
+          </Link>
         </h3>
         <p className="location-line">
           <MapPin size={14} aria-hidden="true" />

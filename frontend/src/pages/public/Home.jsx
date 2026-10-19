@@ -15,6 +15,7 @@ import { collect } from '../../api/paginate.js'
 import { latestPosts } from '../../api/blog.js'
 import { useLookups } from '../../context/LookupContext.jsx'
 import { pluralize } from '../../utils/format.js'
+import { locationGroups } from '../../utils/locations.js'
 import PropertyGrid from '../../components/properties/PropertyGrid.jsx'
 import PostCard from '../../components/blog/PostCard.jsx'
 import ServiceBadge from '../../components/services/ServiceBadge.jsx'
@@ -46,12 +47,18 @@ export default function Home() {
     const match = (services.data ?? []).find((row) => row.name.toLowerCase() === name.toLowerCase())
     return match ? `/services/${match.slug}` : '/services'
   }
-  const heroLinks = [
-    { label: 'Rent collection', to: '/properties?listing_type=RENT' },
-    { label: 'Property management', to: toService('Property Management') },
-    { label: 'Contacting & lobbying', to: toService('Lobbying & Advocacy') },
-    { label: 'Debt recovery', to: toService('Debt Recovery') },
+  const HERO_NAMES = [
+    'Rent collection & property management',
+    'Real estate',
+    'Contracting & lobbying',
+    'Land & property documentation',
+    'Debt recovery',
   ]
+  // Once the services have loaded the published rows win, so the hero follows an
+  // administrator's names and order instead of contradicting them.
+  const heroLinks = services.data?.length
+    ? services.data.map((service) => ({ label: service.name, to: `/services/${service.slug}` }))
+    : HERO_NAMES.map((name) => ({ label: name, to: toService(name) }))
 
   const runSearch = (event) => {
     event.preventDefault()
@@ -88,7 +95,7 @@ export default function Home() {
                     fetchPriority="high"
                   />
                 ) : (
-                  'Bridging gaps. Building value.'
+                  'Bridging gaps'
                 )}
               </h1>
               <div className="hero-focus">
@@ -99,8 +106,7 @@ export default function Home() {
                 ))}
               </div>
               {/*<p>
-                Mant Bridges LTD lists property for rent and sale across Uganda and runs the administration behind it —
-                leases, invoices, payment reconciliation and receipts on one set of books.
+                Mant Bridges LTD lists property for rent and sale across Uganda and runs the administration behind it.
               </p>*/}
               <div className="hero-mission">Your property. Our priority. Your success. Our mission.</div>
               <div className="row" style={{ gap: 12 }}>
@@ -115,7 +121,7 @@ export default function Home() {
                 <div className="hero-stats">
                   <Link to="/properties">
                     <div className="hero-stat-value">{stats.data.available}</div>
-                    <div className="hero-stat-label">Listings available</div>
+                    <div className="hero-stat-label">Property Available</div>
                   </Link>
                   <Link to="/properties?listing_type=RENT">
                     <div className="hero-stat-value">{stats.data.for_rent}</div>
@@ -157,18 +163,22 @@ export default function Home() {
               </Field>
               <Field name="city" label="Location">
                 <Input
+                  as="select"
                   name="city"
                   value={search.city}
                   onChange={(value) => setSearch((current) => ({ ...current, city: value }))}
-                  placeholder="City or area"
-                  list="home-cities"
-                />
-                {/* Cities with a live listing, so a suggestion never returns an empty search. */}
-                <datalist id="home-cities">
-                  {(cityFacets.data || []).map((row) => (
-                    <option key={row.city} value={row.city} />
+                >
+                  <option value="">Anywhere in Uganda</option>
+                  {locationGroups(cityFacets.data || []).map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.cities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
-                </datalist>
+                </Input>
               </Field>
               <Button type="submit" block size="lg" variant="accent">
                 <Search size={17} /> Search property
@@ -207,14 +217,16 @@ export default function Home() {
               <Link to="/contact">Tell us what you need</Link> and we will reply directly.
             </EmptyState>
           ) : (
-            <div className="grid grid-4">
-              {services.data.slice(0, 4).map((service) => (
+            <div className="service-grid">
+              {services.data.map((service) => (
                 <article className="card service-card" key={service.id}>
                   <div className="card-body">
                     <div className="row" style={{ gap: 11, alignItems: 'center' }}>
                       <ServiceBadge icon={service.icon} />
                       <h3>
-                        <Link to={`/services/${service.slug}`}>{service.name}</Link>
+                        <Link className="stretched-link" to={`/services/${service.slug}`}>
+                          {service.name}
+                        </Link>
                       </h3>
                     </div>
                     <span className="flyer-dash" aria-hidden="true" />
@@ -278,7 +290,7 @@ export default function Home() {
             <div className="section-head">
               <div>
                 <p className="eyebrow">Browse by category</p>
-                <h2>Property types on the books</h2>
+                <h2>Available properties</h2>
               </div>
             </div>
             <div className="chip-grid">
@@ -307,20 +319,20 @@ export default function Home() {
               <p className="eyebrow" style={{ color: '#ffb3bd' }}>
                 For landlords
               </p>
-              <h2 style={{ color: '#fff' }}>Put your property on a system that answers for it</h2>
+              <h2 style={{ color: '#fff' }}>Put your property in hands that answer for it</h2>
               <p style={{ color: 'var(--navy-100)', margin: 0 }}>
-                Publish a listing, sign the tenancy, invoice on schedule and see exactly what has been paid. You get a
-                landlord dashboard with the same figures our administrators see for your portfolio.
+                Rent that reaches you on the date it was agreed, faults closed while they are still small and one office
+                accountable for the whole thing — so you can plan around your income instead of chasing it.
               </p>
               <ul className="auth-points" style={{ color: '#fff' }}>
                 <li>
-                  <BadgeCheck size={17} /> Invoices raised from the lease terms, with late-fee rules you can see.
+                  <BadgeCheck size={17} /> Money in your account at the agreed time, early enough to plan the next investment.
                 </li>
                 <li>
-                  <ShieldCheck size={17} /> Payments stay pending until reconciled — no silent “paid” marks.
+                  <ShieldCheck size={17} /> Verified ownership and paperwork before anything is advertised or handed over.
                 </li>
                 <li>
-                  <MessageSquare size={17} /> One thread per tenancy for maintenance, viewing and document requests.
+                  <MessageSquare size={17} /> One team answers for the tenancy, the queries and the follow-up.
                 </li>
               </ul>
               <div className="row">
@@ -344,8 +356,7 @@ export default function Home() {
         <div className="container stack">
           <div className="section-head">
             <div>
-              <p className="eyebrow">From the blog</p>
-              <h2>Guides on rent, tenancies and maintenance</h2>
+              <h2>From the blog</h2>
             </div>
             <Button to="/blog" variant="outline">
               Read all posts <ArrowRight size={16} />

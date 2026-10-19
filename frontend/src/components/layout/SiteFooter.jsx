@@ -11,10 +11,11 @@ const SOCIAL = [
 ]
 
 export function SiteFooter() {
-  const { company } = useLookups()
+  const { options, company } = useLookups()
   const year = new Date().getFullYear()
   const links = SOCIAL.filter((item) => company?.[item.key])
   const address = [company?.address, company?.city, company?.country].filter(Boolean).join(', ')
+  const services = options?.services ?? []
 
   return (
     <footer className="site-footer">
@@ -22,10 +23,19 @@ export function SiteFooter() {
         <div className="footer-grid">
           <div>
             <Brand />
-            <p className="footer-about" style={{ marginTop: 16 }}>
-              Bridging gaps — making possibilities real. Mant Bridges LTD manages property, tenancies and arrears from
-              Kampala, with a written record behind every figure on this site.
-            </p>
+            {services.length ? (
+              <ul className="footer-services">
+                {services.map((service) => (
+                  <li key={service.slug}>
+                    <Link to={`/services/${service.slug}`}>{service.name}</Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="footer-about" style={{ marginTop: 16 }}>
+                Bridging gaps — making possibilities real.
+              </p>
+            )}
             <p className="footer-strip">Professional · Trusted · Result driven</p>
             <div className="row" style={{ marginTop: 16, gap: 10 }}>
               {links.map((item) => (

@@ -20,7 +20,8 @@
 
   --ink: #10203a;
   --ink-soft: #46586f;
-  --ink-muted: #74839a;
+  /* Was #74839a, which sat at 3.4:1 on the page ground and failed AA for body-sized text. */
+  --ink-muted: #5a6a83;
 
   --paper: #ffffff;
   /* Page grounds carry a navy wash so the public pages do not read as one long white column. */
@@ -28,6 +29,10 @@
   --surface-2: #dde7f2;
   --line: #dde5ee;
   --line-strong: #c3d0de;
+  /* Header band on every card. Sits between --surface and --surface-2 so it reads as the same
+     family as the page wash and the editor gradient, while staying lighter than both so the
+     card body below it still looks like paper. */
+  --card-head-bg: #e4edf7;
 
   --ok: #147d4f;
   --ok-bg: #dff3e8;
@@ -212,6 +217,15 @@ hr {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* The published services vary in count, so the row fits as many as the container
+   allows instead of fixing a column number. auto-fit (not auto-fill) keeps a
+   four-service row from leaving an empty track on the right. */
+.service-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
 }
 
 .split {
@@ -464,7 +478,7 @@ hr {
   gap: 14px;
   padding: 16px 22px;
   border-bottom: 1px solid var(--line);
-  background: var(--paper);
+  background: var(--card-head-bg);
 }
 
 .card-head h3,
@@ -482,6 +496,14 @@ hr {
 
 .card-flat {
   box-shadow: none;
+}
+
+/* The navy edge above a header band. Keyed on .card-head so the photo-first cards — property and
+   blog — keep their image as the top of the card instead of gaining a line above the picture.
+   .service-card already carries this edge. */
+.card:has(.card-head),
+.panel {
+  border-top: 3px solid var(--navy-700);
 }
 
 .panel {
@@ -596,10 +618,18 @@ hr {
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: #fff;
+  background-color: var(--navy-50);
   color: var(--ink);
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition), box-shadow var(--transition),
+    background-color var(--transition);
   font-size: 0.94rem;
+}
+
+/* Placeholders were tuned against paper, so they need an explicit value on the wash. */
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--ink-soft);
+  opacity: 1;
 }
 
 .textarea {
@@ -612,6 +642,7 @@ hr {
 .select:focus,
 .textarea:focus {
   outline: none;
+  background-color: #fff;
   border-color: var(--navy-600);
   box-shadow: 0 0 0 3px rgba(29, 67, 115, 0.14);
 }
@@ -619,7 +650,7 @@ hr {
 .input:disabled,
 .select:disabled,
 .textarea:disabled {
-  background: var(--surface-2);
+  background-color: var(--surface-2);
   color: var(--ink-muted);
   cursor: not-allowed;
 }
@@ -692,6 +723,21 @@ hr {
   background: transparent;
   padding: 8px 0;
   min-width: 0;
+}
+
+/*
+ * A card or modal that contains fields puts the page wash behind its heading, so an editor stops
+ * reading as one all-white box. Keyed on .field rather than <form> because most admin editors are
+ * button-driven and never render a form element.
+ */
+.card:has(.field) > .card-head,
+.modal:has(.field) > .modal-head {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+}
+
+/* .modal does not clip its children the way .card does, so the band needs the corner itself. */
+.modal:has(.field) > .modal-head {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 /* ---------- Alerts ------------------------------------------------------ */
@@ -954,7 +1000,7 @@ hr {
   object-fit: contain;
 }
 
-/* What visitors actually arrive for, as four links instead of a sentence about it. */
+/* What visitors actually arrive for, as links instead of a sentence about it. */
 .hero-focus {
   display: flex;
   flex-wrap: wrap;
@@ -1057,8 +1103,10 @@ hr {
   color: var(--navy-100);
 }
 
+/* On the navy hero ground the wells would vanish, so these fields stay on paper. */
 .search-panel .input,
 .search-panel .select {
+  background-color: #fff;
   border-color: rgba(215, 226, 239, 0.55);
 }
 
@@ -1237,6 +1285,29 @@ hr {
   color: #b9c9dd;
 }
 
+/* The published services, as the bullet list under the footer logo. */
+.footer-services {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.footer-services li {
+  position: relative;
+  padding-left: 17px;
+}
+
+.footer-services li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red-500);
+}
+
 .footer-bottom {
   margin-top: 44px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
@@ -1250,6 +1321,41 @@ hr {
 }
 
 /* ---------- Property cards ---------------------------------------------- */
+/*
+ * Whole-card navigation. The card's own link is stretched across the card with an overlay
+ * pseudo-element, so any part of it opens the destination while keyboard focus, middle-click
+ * and open-in-new-tab keep working — and the real controls inside a card stay clickable above it.
+ */
+.property-card,
+.post-card,
+.service-card {
+  position: relative;
+}
+
+.stretched-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.property-card a:not(.stretched-link),
+.property-card button,
+.post-card a:not(.stretched-link),
+.post-card button,
+.service-card a:not(.stretched-link),
+.service-card button {
+  position: relative;
+  z-index: 2;
+}
+
+.property-card:hover .property-title a,
+.post-card:hover .post-title a,
+.service-card:hover h3 a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .property-card {
   background: #fff;
   border: 1px solid var(--line);
@@ -2245,12 +2351,23 @@ hr {
   list-style: none;
 }
 
+/* Default is the dark-ground treatment: this list was built for navy bands. Anything sitting on
+   the page ground or a white card needs .auth-points-light, or the text lands at about 1.1:1. */
 .auth-points li {
   display: flex;
   gap: 11px;
   align-items: flex-start;
   color: var(--navy-100);
   font-size: 0.93rem;
+  line-height: 1.65;
+}
+
+.auth-points-light li {
+  color: var(--ink);
+}
+
+.auth-points-light svg {
+  color: var(--red-600);
 }
 
 .auth-points svg { flex: none; margin-top: 2px; }
@@ -2872,7 +2989,7 @@ hr {
 
 .value-band {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 22px;
 }
 

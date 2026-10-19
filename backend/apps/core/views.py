@@ -114,6 +114,11 @@ class LookupsAPIView(APIView):
             "lease_statuses": choices(Lease, "status"),
             "late_fee_types": choices(Company, "late_fee_type"),
             "service_categories": choices(Service, "category"),
+            # Published services in display order, so shared chrome such as the footer can link the
+            # real offers without a second request on every page.
+            "services": list(
+                Service.objects.published().order_by("order", "id").values("name", "slug")
+            ),
             "roles": choices(User, "role"),
             "blog_categories": list(
                 Category.objects.values("id", "name", "slug").order_by("name")

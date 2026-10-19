@@ -3,6 +3,10 @@
 Pictures are matched by file name against ``Service.slug``. A service that already
 has an image is left alone, so an upload made in the admin interface is never
 overwritten and the command can be re-run safely.
+
+``--replace SLUG [SLUG ...]`` is the authorised exception: it re-attaches the seed file
+for the named services only, which is how a deliberate picture change reaches a database
+that has already been seeded.
 """
 from pathlib import Path
 
@@ -24,6 +28,12 @@ class Command(BaseCommand):
             action="store_true",
             help="Report what would be attached without writing anything.",
         )
+        parser.add_argument(
+            "--replace",
+            nargs="+",
+            metavar="SLUG",
+            help="Overwrite the picture for these services only, taking it from the seed folder.",
+        )
 
     def handle(self, *args, **options):
         folder = Path(settings.BASE_DIR) / SOURCE_DIRNAME
@@ -32,6 +42,7 @@ class Command(BaseCommand):
             return
 
         verbose = options["verbosity"] > 0
+        replace = set(options["replace"] or ())
         attached, kept, missing = [], [], []
 
         for path in sorted(folder.glob("*.jpg")) + sorted(folder.glob("*.png")):
@@ -39,7 +50,7 @@ class Command(BaseCommand):
             if service is None:
                 missing.append(path.name)
                 continue
-            if service.image:
+            if service.image and path.stem not in replace:
                 kept.append(service.slug)
                 continue
             if not options["dry_run"]:

@@ -24,7 +24,9 @@ export default function PostCard({ post }) {
           {post.is_featured ? <span className="badge badge-red">Featured</span> : null}
         </div>
         <h3 className="post-title">
-          <Link to={`/blog/${post.slug}`}>{post.title}</Link>
+          <Link className="stretched-link" to={`/blog/${post.slug}`}>
+            {post.title}
+          </Link>
         </h3>
         {post.excerpt_text ? <p className="muted" style={{ margin: 0 }}>{post.excerpt_text}</p> : null}
         <div className="post-meta">

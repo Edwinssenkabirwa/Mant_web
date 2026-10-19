@@ -192,10 +192,10 @@ class SeedServicesCommandTests(ApiTestCase):
     def test_second_run_does_not_duplicate_or_overwrite_admin_edits(self):
         call_command("seed_services", verbosity=0)
         first_ids = set(Service.objects.values_list("id", flat=True))
-        self.assertEqual(len(first_ids), 4)
-        self.assertEqual(Service.objects.published().count(), 4)
+        self.assertEqual(len(first_ids), 5)
+        self.assertEqual(Service.objects.published().count(), 5)
 
-        edited = Service.objects.get(name="Debt Recovery")
+        edited = Service.objects.get(name="Debt recovery")
         edited.summary = "Rewritten by an administrator."
         edited.is_published = False
         edited.save()
@@ -207,11 +207,17 @@ class SeedServicesCommandTests(ApiTestCase):
         self.assertEqual(edited.summary, "Rewritten by an administrator.")
         self.assertFalse(edited.is_published)
 
-    def test_seeded_names_are_the_four_brochure_offers(self):
+    def test_seeded_names_are_the_published_offers_in_brochure_order(self):
         call_command("seed_services", verbosity=0)
         self.assertEqual(
             list(Service.objects.order_by("order").values_list("name", flat=True)),
-            ["Property Management", "Real Estate Management", "Lobbying & Advocacy", "Debt Recovery"],
+            [
+                "Rent collection & property management",
+                "Real estate",
+                "Contracting & lobbying",
+                "Land & property documentation",
+                "Debt recovery",
+            ],
         )
 
     def test_icons_stay_inside_the_whitelist_the_frontend_renders(self):
@@ -220,13 +226,41 @@ class SeedServicesCommandTests(ApiTestCase):
         for service in Service.objects.all():
             self.assertIn(service.icon, allowed)
 
-    def test_lobbying_does_not_claim_registry_or_advocate_status(self):
+    def test_lobbying_does_not_offer_influence_for_sale(self):
         call_command("seed_services", verbosity=0)
         service = Service.objects.get(category=Service.Category.LOBBYING_ADVOCACY)
+        text = f"{service.summary} {service.description} {service.limitations}".lower()
+        self.assertIn("cannot guarantee an award", text)
+        self.assertIn("written instruction", text)
+        self.assertNotIn("guarantee a win", text)
+
+    def test_land_documentation_does_not_claim_registry_or_advocate_status(self):
+        call_command("seed_services", verbosity=0)
+        service = Service.objects.get(slug="land-documentation")
         text = f"{service.summary} {service.description} {service.limitations}".lower()
         self.assertIn("not a land registry", text)
         self.assertIn("licensed advocate", text)
         self.assertNotIn("guarantee title", text)
+
+    def test_no_service_describes_the_billing_system_to_clients(self):
+        """Invoice and receipt mechanics are staff tooling; the published copy sells outcomes."""
+        call_command("seed_services", verbosity=0)
+        for service in Service.objects.all():
+            text = f"{service.summary} {service.description} {service.limitations}".lower()
+            for term in ("invoice", "receipt", "ledger"):
+                self.assertNotIn(term, text, f"{service.slug} mentions {term}")
+
+    def test_no_service_copy_names_government(self):
+        """No published line of any service names government — in prose or in the bullet lists."""
+        call_command("seed_services", verbosity=0)
+        for service in Service.objects.all():
+            for text in (
+                service.summary,
+                service.description,
+                service.limitations,
+                " ".join(service.highlights or []),
+            ):
+                self.assertNotIn("government", (text or "").lower(), f"{service.slug} names government")
 
 
 class NewsletterTests(ApiTestCase):

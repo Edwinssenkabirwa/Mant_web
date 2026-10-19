@@ -48,23 +48,28 @@ Interactive admin is at `http://127.0.0.1:8000/django-admin/`, OpenAPI docs at
 
 ### Service entries
 
-The website advertises the four offers printed on the company brochures — **Property Management ·
-Real Estate Management · Lobbying & Advocacy · Debt Recovery** — and their wording comes from the
-database, never from a list hard-coded in React. `seed_services` creates them by name and leaves any
-existing row exactly as an administrator set it; `attach_service_images` puts the matching
-illustration from `backend/seed_images/services/<slug>.jpg` onto a service that has no picture yet,
-without touching an uploaded photograph. `Service.icon` is a whitelisted key that the frontend maps
-to its own icon set, so a value outside the list renders no badge. Migration `core.0006` folded the
-five rows seeded before the brochures into these four; the withdrawn "Land documentation" row keeps
-its text and artwork and is only unpublished.
+The website advertises five offers — **Rent collection & property management · Real estate ·
+Contracting & lobbying · Land & property documentation · Debt recovery** — in that published order,
+and their wording comes from the database, never from a list hard-coded in React. `seed_services`
+creates them by slug and leaves any existing row exactly as an administrator set it; pass `--update`
+to refresh a live database from the seeder after a deliberate copy change. `attach_service_images`
+puts the matching illustration from `backend/seed_images/services/<slug>.jpg` onto a service that has
+no picture yet, without touching an uploaded photograph; `--replace SLUG` is the only way an existing
+picture is swapped. `Service.icon` is a whitelisted key that the frontend maps to its own icon set, so
+a value outside the list renders no badge. Migration `core.0006` folded the rows seeded before the
+brochures into the four brochure offers, `core.0008` relabelled them and re-added land documentation
+as a published fifth service.
 
-The picture and the badge under each offer follow the portrait flyer: building / keys / landmark /
-coins, over an apartment block, a glass office, a handshake in front of a government dome and a
-gavel on law books. Those four files in `backend/seed_images/services/` are AI renders matched to
-the flyer's photographs, not crops of it — the shared flyer is 904×1280, so each of its service
-pictures is only about 200×110 px and would not survive the banner on the service page. They are
-labelled illustrative in `Service.image_alt`. Migration `core.0007` moved the Debt Recovery badge
-from a gavel to the money disc the flyer draws.
+The badge under each offer is building / keys / landmark / document / coins. The service-page artwork
+is AI-rendered and labelled illustrative in `Service.image_alt`: an apartment block, a plot of land
+for sale, a contractor reviewing drawings on site, a land-transaction file and stacked US dollar
+bundles. They are not crops of the shared flyer, which is 904×1280 — each of its service pictures is
+only about 200×110 px and would not survive the banner on the service page.
+
+Service copy is written in a small markdown-like dialect that `ServiceView` parses: a `## ` line
+becomes a subheading, consecutive `- ` lines become a bulleted list, and a blank line separates
+paragraphs. Nothing else (bold, links, numbered lists) is rendered, and administrators are free to
+write plain prose instead.
 
 ### `backend/.env`
 

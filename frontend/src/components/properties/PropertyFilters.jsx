@@ -2,6 +2,7 @@ import { RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 import { Check, Field, Input, SelectOptions } from '../ui/Form.jsx'
 import { Button } from '../ui/Button.jsx'
+import { locationGroups } from '../../utils/locations.js'
 
 const COUNT_CHOICES = [
   { value: '1', label: '1+' },
@@ -29,6 +30,8 @@ export default function PropertyFilters({ filters, options, onApply, onReset, ac
     .split(',')
     .filter(Boolean)
 
+  const locations = locationGroups(options?.cities || [])
+
   const toggleAmenity = (name) => {
     const next = amenities.includes(name) ? amenities.filter((item) => item !== name) : [...amenities, name]
     set({ amenities: next.length ? next.join(',') : undefined })
@@ -41,6 +44,28 @@ export default function PropertyFilters({ filters, options, onApply, onReset, ac
       onChange={(value) => setDraft((current) => ({ ...current, [key]: value }))}
       {...props}
     />
+  )
+
+  // Grouped by hand rather than through SelectOptions because a plain select is the only way to
+  // put our four areas above the rest without inventing a second field.
+  const locationSelect = (
+    <Input
+      as="select"
+      name="city"
+      value={draft.city}
+      onChange={(value) => setDraft((current) => ({ ...current, city: value }))}
+    >
+      <option value="">Anywhere in Uganda</option>
+      {locations.map((group) => (
+        <optgroup key={group.label} label={group.label}>
+          {group.cities.map((city) => (
+            <option key={city} value={city}>
+              {city}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </Input>
   )
 
   return (
@@ -85,11 +110,11 @@ export default function PropertyFilters({ filters, options, onApply, onReset, ac
       <div className="filter-group">
         <p className="filter-title">Location and price</p>
         <div className="stack stack-sm">
-          <Field name="city">
-            {draftField('city', { placeholder: 'City, e.g. Kampala' })}
+          <Field name="city" label="Location">
+            {locationSelect}
           </Field>
-          <Field name="district">
-            {draftField('district', { placeholder: 'District, e.g. Ntinda' })}
+          <Field name="district" label="Area / locality">
+            {draftField('district', { placeholder: 'Area, e.g. Ntinda' })}
           </Field>
           <div className="row" style={{ gap: 10 }}>
             <Field name="min_price">

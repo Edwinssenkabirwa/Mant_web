@@ -15,6 +15,8 @@ const EMPTY = {
   invoice_statuses: [],
   lease_statuses: [],
   late_fee_types: [],
+  service_categories: [],
+  services: [],
   roles: [],
   blog_categories: [],
   currency: 'UGX',

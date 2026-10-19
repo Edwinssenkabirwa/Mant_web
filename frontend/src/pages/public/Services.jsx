@@ -30,12 +30,12 @@ const PROCESS = [
   {
     icon: CalendarClock,
     title: 'Administration on schedule',
-    body: 'Invoices, reminders, statements and reports are produced on the calendar the mandate sets.',
+    body: 'Reminders, follow-ups and progress notes reach you on the calendar the mandate sets, not whenever someone remembers.',
   },
   {
     icon: KeyRound,
     title: 'Handover and reporting',
-    body: 'You get the ledger, the documents and the current position at the point you ask for it.',
+    body: 'You get the documents, the current accounts position and a clear answer on what is outstanding whenever you ask for it.',
   },
 ]
 
@@ -50,12 +50,12 @@ export default function Services() {
       >
         <div className="container stack">
           <p className="eyebrow" style={{ color: '#ffb3bd' }}>
-            Our services
+            Comprehensive. Professional. Results Driven.
           </p>
-          <h1 style={{ color: '#fff', maxWidth: '24ch' }}>Comprehensive. Professional. Results Driven.</h1>
+          <h1 style={{ color: '#fff', maxWidth: '24ch' }}> Our services </h1>
           <p style={{ color: 'var(--navy-100)', maxWidth: '70ch', margin: 0 }}>
-            Four offers, written as our brochures describe them: property management, real estate management, lobbying
-            and advocacy, and debt recovery — each run from the same administration desk in Kampala.
+            Rent collection &amp; property management, Real estate, Contracting &amp; lobbying,
+            Land &amp; property documentation, and lastly Debt recovery.
           </p>
         </div>
         <span className="arc-swoosh" aria-hidden="true" />
@@ -133,7 +133,7 @@ export default function Services() {
             <div>
               <p className="eyebrow">How we work</p>
               <h2>Four steps, documented</h2>
-              <p>The same sequence applies whether we are invoicing a tenancy or coordinating works on a building.</p>
+              <p>The same sequence applies whether we are collecting rent, placing a buyer, chasing money owed to you or coordinating works on a building.</p>
             </div>
           </div>
           <div className="timeline">
@@ -158,7 +158,7 @@ export default function Services() {
         </section>
 
         <section className="photo-band photo-band-short">
-          <img src="/images/contracting.jpg" alt="Property works and site coordination in Uganda" />
+          <img src="/images/contracting-aerial.jpg" alt="Illustrative aerial render of a building project under construction in Kampala" />
           <div className="photo-overlay">
             <h3>Instructing us, or getting your property managed</h3>
             <p style={{ maxWidth: '60ch' }}>
@@ -173,6 +173,9 @@ export default function Services() {
                 Create an account
               </Button>
             </div>
+            <p className="tiny" style={{ margin: '10px 0 0', opacity: 0.75 }}>
+              Aerial view is an illustrative render, not a photograph of a Mant Bridges project.
+            </p>
           </div>
         </section>
       </div>

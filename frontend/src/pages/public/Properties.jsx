@@ -45,8 +45,8 @@ export default function Properties() {
       <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'Properties' }]} />
       <header className="section-head" style={{ marginBottom: 6 }}>
         <div>
-          <p className="eyebrow">Property catalogue</p>
-          <h1>Find your next home or investment</h1>
+          <p className="eyebrow">Find your next home or investment</p>
+          <h1> Property catalogue</h1>
           <p>
             Listings come straight from the Mant Bridges books. Availability, price and landlord are recorded on each
             property.
@@ -114,8 +114,8 @@ export default function Properties() {
           />
 
           <Callout>
-            Interested in something not listed? We source property for clients across Kampala, Wakiso and Entebbe —{' '}
-            <Link to="/contact">tell us what you need</Link>.
+            Interested in something not listed? We source property for clients across Kampala, Wakiso, Mukono, Masaka
+            and all major cities of Uganda — <Link to="/contact">tell us what you need</Link>.
           </Callout>
         </div>
 

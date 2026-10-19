@@ -118,7 +118,7 @@ export default function Contact() {
                   <Button to="/login" variant="link" size="sm">
                     Sign in
                   </Button>{' '}
-                  to see your invoices, record a payment or message the team directly.
+                  to follow your payments and documents, or message the team directly.
                 </span>
               </Callout>
             </aside>

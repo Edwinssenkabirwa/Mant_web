@@ -120,10 +120,11 @@ class Service(TimeStampedModel):
     """A service the company offers, written and published by administrators."""
 
     class Category(models.TextChoices):
-        PROPERTY_MANAGEMENT = "PROPERTY_MANAGEMENT", "Property management"
-        REAL_ESTATE_MANAGEMENT = "REAL_ESTATE_MANAGEMENT", "Real estate management"
-        LOBBYING_ADVOCACY = "LOBBYING_ADVOCACY", "Lobbying & advocacy"
+        PROPERTY_MANAGEMENT = "PROPERTY_MANAGEMENT", "Rent collection & property management"
+        REAL_ESTATE_MANAGEMENT = "REAL_ESTATE_MANAGEMENT", "Real estate"
+        LOBBYING_ADVOCACY = "LOBBYING_ADVOCACY", "Contracting & lobbying"
         DEBT_RECOVERY = "DEBT_RECOVERY", "Debt recovery"
+        LAND_DOCUMENTATION = "LAND_DOCUMENTATION", "Land & property documentation"
         OTHER = "OTHER", "Other"
 
     class Icon(models.TextChoices):

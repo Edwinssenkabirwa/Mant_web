@@ -28,15 +28,16 @@ COMPANY = {
     "legal_name": "Mant Bridges Limited",
     "tagline": "Bridging gaps",
     "about": (
-        "Mant Bridges LTD is a Kampala-based real estate company managing rentals, sales "
-        "and tenancy administration across the Central and Eastern regions of Uganda.\n\n"
-        "We list verified apartments, family houses, offices, shops, warehouses and land, "
-        "and we stay with the transaction long after the keys change hands. Our rent desk "
-        "issues invoices, records cash, bank and mobile money payments, applies late fees "
-        "fairly and produces a downloadable receipt for every shilling received.\n\n"
-        "Landlords get a live dashboard of what has been billed, what has been collected "
-        "and what is still outstanding. Tenants get the same clarity, plus a direct line "
-        "to our administration team for maintenance, documents and payment queries."
+        "Mant Bridges is located in Kampala, operating in Kampala, Wakiso, Mukono, Masaka and "
+        "all major cities of Uganda.\n\n"
+        "We do rent collection and property management, real estate, contracting and lobbying, "
+        "debt recovery, and land and property documentation. We also list verified apartments, "
+        "family houses, offices, shops, warehouses and land, and we stay with the transaction "
+        "long after the keys change hands.\n\n"
+        "Landlords get a property that is answered for: rent arriving on the date it was "
+        "agreed, faults closed while they are still small, and a position they can plan an "
+        "investment around. Tenants get a working agreement, a proper handover and a direct "
+        "line to the office for maintenance, documents and queries."
     ),
     "email": "mantbridgesltd@gmail.com",
     "phone": "+256 752629260",

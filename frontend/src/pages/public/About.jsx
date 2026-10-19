@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Building2, Compass, FileText, HandCoins, Handshake, Scale, ShieldCheck, Target } from 'lucide-react'
+import { ArrowRight, Building2, Compass, FileText, HandCoins, Handshake, ShieldCheck, Target } from 'lucide-react'
 import { propertyCities, propertyStats } from '../../api/properties.js'
 import { useApi } from '../../hooks/useApi.js'
 import { useLookups } from '../../context/LookupContext.jsx'
@@ -7,49 +7,46 @@ import { Breadcrumb, Callout, Stat } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Skeleton } from '../../components/ui/Feedback.jsx'
 
+// The three values from the brochure, stated so that each one covers every service rather than
+// rent collection alone — the same sentence has to hold for a title file or a tender.
 const BROCHURE_VALUES = [
   {
     icon: ShieldCheck,
     title: 'Professionalism',
-    body: 'A written mandate, a named desk and a reporting calendar. Instructions are answered from records, not memory.',
-  },
-  {
-    icon: Scale,
-    title: 'Integrity',
-    body: 'We say what we are not: not a land registry, not a valuer, not an advocate. Those steps go to a licensed professional.',
-  },
-  {
-    icon: Target,
-    title: 'Results',
-    body: 'Rent collected, arrears recovered, files handed over. Every figure on this site comes from those records.',
+    body: 'Consistency, integrity and respect in how we carry every instruction, and timely delivery of what we agreed to do. The same standard whether it is a tenancy, a sale, a title file, a contract or money owed to you.',
   },
   {
     icon: Handshake,
-    title: 'Partnership',
-    body: 'Landlord, tenant and buyer read the same ledger, so nobody has to take our word for what has been paid.',
+    title: 'Trust',
+    body: 'Trust is built the ordinary way: we tell you what will happen, then it happens. Named contacts, agreed dates and predictable follow-up are what make us reliable enough to be handed a property, a purchase or a debt to chase.',
+  },
+  {
+    icon: Target,
+    title: 'Result driven',
+    body: 'We are committed to our word and oriented to the outcome we were hired for. We work toward the agreed terms until they are met — money received on the agreed day, a buyer introduced, a contract pursued, papers cleared.',
   },
 ]
 
 const VALUES = [
   {
-    icon: ShieldCheck,
+    icon: FileText,
     title: 'Verified before advertised',
-    body: 'A listing goes public with an owner, a status and a price on record. Anything we cannot document, we do not publish.',
+    body: 'Before a listing goes public, a file is opened for a purchase or a recovery is taken on, we establish who it belongs to, what is proven on paper and what is still assumed. What we cannot document, we do not publish or pursue.',
   },
   {
-    icon: FileText,
-    title: 'Paperwork that answers for itself',
-    body: 'Leases, invoices, payment records and receipts are stored against the tenancy, so a query can be answered from the ledger rather than memory.',
+    icon: Compass,
+    title: 'Work that answers for itself',
+    body: 'Every instruction leaves a file: what you asked for, the steps we took and what came of them. A query is answered from that file rather than from memory, whichever service it belongs to.',
   },
   {
     icon: HandCoins,
     title: 'Money treated seriously',
-    body: 'Payments are logged as received and reconciled, never marked paid on trust. A receipt exists for every confirmed payment.',
+    body: 'Where money is involved — rent, a purchase price, a recovery or a project payment — it is tracked to the right person and reported on the day it was agreed, never left to someone remembering.',
   },
   {
-    icon: Compass,
+    icon: ShieldCheck,
     title: 'One team accountable',
-    body: 'The same administration desk handles the enquiry, the tenancy and the arrears, so instructions are not passed sideways.',
+    body: 'The same office carries the enquiry, the work and the follow-up, so an instruction is not passed sideways between departments or dropped between services.',
   },
 ]
 
@@ -63,11 +60,12 @@ export default function About() {
       <section className="section-tight" style={{ padding: '40px 0 8px' }}>
         <div className="container stack">
           <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'About' }]} />
-          <p className="eyebrow">About Mant Bridges LTD</p>
-          <h1>Managing properties with excellence, creating value that lasts.</h1>
+          <p className="eyebrow">Managing properties with excellence, creating value that lasts.</p>
+          <h1>About Mant Bridges LTD</h1>
           <p className="lead" style={{ maxWidth: '78ch' }}>
-            {company?.legal_name || company?.name || 'Mant Bridges LTD'} works in Kampala and the surrounding districts
-            on four fronts: property management, real estate management, lobbying and advocacy, and debt recovery.
+            {company?.legal_name || company?.name || 'Mant Bridges LTD'} is located in Kampala and operates in Kampala,
+            Wakiso, Mukono, Masaka and all major cities of Uganda on five fronts: Rent collection &amp; property
+            management, Real estate, Contracting &amp; lobbying, Land &amp; property documentation and Debt recovery.
           </p>
         </div>
       </section>
@@ -77,11 +75,11 @@ export default function About() {
           <div className="photo-band photo-band-tall">
             <img src="/images/kampala.jpg" alt="Residential neighbourhoods in Kampala, Uganda" />
             <div className="photo-overlay">
-              <h2 style={{ maxWidth: '26ch' }}>A real estate practice built around records</h2>
+              <h2 style={{ maxWidth: '26ch' }}>Bridging Gaps</h2>
               <p style={{ maxWidth: '62ch' }}>
-                Listings, leases, invoices and receipts live in one system, and this website reads from it. The numbers
-                on this page are the current state of those books.
+                We build bridges of trust, create lasting value and close every gap between you and your goals.
               </p>
+              <p>We are your trusted partner in managing properties, unlocking opportunities and delivering results.</p>
             </div>
           </div>
         </div>
@@ -171,9 +169,10 @@ export default function About() {
               <p className="eyebrow" style={{ color: '#ffb3bd' }}>
                 What we stand for
               </p>
-              <h2 style={{ color: '#fff' }}>Professionalism · Integrity · Results · Partnership</h2>
+              <h2 style={{ color: '#fff' }}>Professionalism · Trust · Result driven</h2>
               <p style={{ color: 'var(--navy-100)' }}>
-                The four values printed on our brochure, stated the way we can actually be measured against them.
+                Three values, stated the way we can actually be measured against them — across every service, not rent
+                collection alone.
               </p>
             </div>
           </div>
@@ -214,8 +213,8 @@ export default function About() {
             ))}
           </div>
           <Callout>
-            We do not publish awards, client counts or testimonials we cannot evidence. If a figure is on this site, it
-            came from the property and rent records behind it.
+            We do not publish awards, client counts or testimonials we cannot evidence. If a figure appears on this
+            site, it came out of the work behind it, whichever service it belongs to.
           </Callout>
         </div>
       </section>

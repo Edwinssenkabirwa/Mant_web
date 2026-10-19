@@ -49,11 +49,10 @@ export default function Blog() {
       <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'Blog' }]} />
       <header className="section-head" style={{ marginBottom: 6 }}>
         <div>
-          <p className="eyebrow">Insights</p>
-          <h1>Property, rent and paperwork</h1>
+          <p className="eyebrow">Company news, market insights, renting tips and landlord desk</p>
+          <h1>Insights</h1>
           <p>
-            Notes we write for our own clients — landlord law, rent bookkeeping and what to check before signing.
-            Nothing here is legal advice.
+          
           </p>
         </div>
       </header>
