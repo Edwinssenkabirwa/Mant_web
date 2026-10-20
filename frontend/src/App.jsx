@@ -37,6 +37,9 @@ import Messages from './pages/shared/Messages.jsx'
 import ManagePosts from './pages/manage/ManagePosts.jsx'
 import PostForm from './pages/manage/PostForm.jsx'
 import ManageCategories from './pages/manage/ManageCategories.jsx'
+import ManageServices from './pages/manage/ManageServices.jsx'
+import ServiceForm from './pages/manage/ServiceForm.jsx'
+import ServicePreview from './pages/manage/ServicePreview.jsx'
 import CompanySettings from './pages/manage/CompanySettings.jsx'
 import EmailCampaigns from './pages/manage/EmailCampaigns.jsx'
 import EmailSubscribers from './pages/manage/EmailSubscribers.jsx'
@@ -105,6 +108,10 @@ export default function App() {
               <Route path="manage/posts/new" element={<PostForm />} />
               <Route path="manage/posts/:id/edit" element={<PostForm />} />
               <Route path="manage/categories" element={<ManageCategories />} />
+              <Route path="manage/services" element={<ManageServices />} />
+              <Route path="manage/services/new" element={<ServiceForm />} />
+              <Route path="manage/services/:id/edit" element={<ServiceForm />} />
+              <Route path="manage/services/:id/preview" element={<ServicePreview />} />
               <Route path="manage/email/campaigns" element={<EmailCampaigns />} />
               <Route path="manage/email/subscribers" element={<EmailSubscribers />} />
               <Route path="manage/company" element={<CompanySettings />} />

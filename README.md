@@ -72,10 +72,17 @@ becomes a subheading, consecutive `- ` lines become a bulleted list, and a blank
 paragraphs. Nothing else (bold, links, numbered lists) is rendered, and administrators are free to
 write plain prose instead.
 
-No public page prints a disclaimer. `Service.limitations` still stores the hedging for staff, but the
-service cards and service pages stopped rendering the "Honest limits" note, and migration `core.0009`
-removed the two body sections that read the same way — "The line we hold" on debt recovery and
-"Where our role stops" on land documentation.
+Administrators write it at `/manage/services`. The list publishes, unpublishes and re-orders with
+single-field PATCH calls, so saved wording is never resent, and `pages/manage/ServiceForm.jsx` holds
+the whole record. The editor counts the headings, lists and paragraphs a draft will produce using the
+same `parseBlocks` the page renders with, so the counters cannot disagree with the site.
+`/manage/services/:id/preview` opens a draft through the admin endpoint — the only way to read an
+unpublished page, since its public address answers 404 until it is published.
+
+No public page prints a disclaimer. `Service.limitations` still stores the hedging for staff — the
+editor labels it "Notes for the desk" and says so — but the service cards and service pages stopped
+rendering the "Honest limits" note, and migration `core.0009` removed the two body sections that read
+the same way: "The line we hold" on debt recovery and "Where our role stops" on land documentation.
 
 ### `backend/.env`
 
@@ -168,6 +175,10 @@ campaign where it stopped; each recipient gets at most 3 attempts before it is m
   writable field. Token hashes are not serialized.
 - `/api/manage/email/campaigns/` (+`stats/`, `audience-count/`, `{id}/{preview,recipients,test,queue,cancel}/`)
   — admin drafts. Nothing here sends a campaign; `queue/` only freezes the audience.
+- `/api/manage/services/` — full admin CRUD for the website's services. The list and detail routes
+  are the standard five verbs, so a picture is replaced with a **multipart PATCH** to
+  `/api/manage/services/{id}/` (POST there answers 405) while the wording is saved as JSON; the API
+  tests in `apps/core/tests.py` cover exactly that pair.
 
 Two conventions matter when extending the UI:
 
@@ -187,7 +198,8 @@ Complete and wired to real data:
 `/manage/properties` (+`new`, `:id/edit`) · `/manage/leases` (+`new`, `:id/edit`) ·
 `/manage/invoices` (+`:id`) · `/manage/payments` · `/manage/receipts` · `/manage/messages` ·
 `/manage/profile` · `/manage/password` · `/manage/users` · `/manage/enquiries` ·
-`/manage/posts` (+`new`, `:id/edit`) · `/manage/categories` · `/manage/email/campaigns` ·
+`/manage/posts` (+`new`, `:id/edit`) · `/manage/categories` ·
+`/manage/services` (+`new`, `:id/edit`, `:id/preview`) · `/manage/email/campaigns` ·
 `/manage/email/subscribers` · `/manage/company` · `/manage/recommendations` ·
 `/landlord` · `/landlord/properties` · `/landlord/recommendations` (+`new`, `:id/edit`) ·
 `/landlord/messages` · `/landlord/profile` ·
@@ -425,6 +437,22 @@ refused with 400 and `GET /api/landlord/recommendations/1/` (Joseph's row) answe
 surfaced during this pass and were fixed: both new tables were passing their row renderer as
 children instead of `renderRow`, which blanked the page.
 
+The services editor was walked through in the browser as the desk, on the dev server, with a temporary
+sixth record that was deleted at the end of the pass. Creating it from `/manage/services/new` produced
+`/services/editor-smoke-test` on the public site, and the copy typed into the form rendered exactly as
+its counters predicted — one `## ` heading, one two-item `- ` list, two paragraphs, the summary in the
+band, two points under "What it covers" and the shield badge. Unpublishing took it out of
+`GET /api/services/` and made its public address answer 404, while `/manage/services/6/preview` still
+rendered it with the "Preview of a draft" note in the band. Saving the wording and picking a picture
+are two calls, and both were exercised: the PUT stored the rewritten summary and position, then the
+multipart PATCH attached `editor-upload-check.png`, answered 200 and served `image/png` from
+`/media/services/2026/10/`. That second call is why `uploadServiceImage()` uses PATCH — the same
+request sent as POST to the detail route answers 405. Publish/Unpublish and the arrows were clicked
+rather than assumed; the swap left `debt-recovery` at position 9, which was set back to 5, and the
+temporary row plus its uploaded file were removed, so the table is the same five published services at
+orders 1–5 with their original artwork. Console stayed clean apart from the two React Router
+future-flag warnings.
+
 **Not verified:** the brochure wording and the new badge/arc motifs seen as a picture — the in-app
 browser in this session renders a 543×426 viewport and one full-page capture was refused
 (`NATIVE_BROWSER_VIEWPORT_UNAVAILABLE`), so those surfaces were read from accessibility snapshots and
@@ -435,7 +463,9 @@ queue/cancel affordances are covered by tests and by a clean build, not by a scr
 desktop-width rendering of the newsletter band (the automation browser sat at a 543×426 viewport, so
 only the stacked mobile layout was screenshotted and measured); delivery of a real email —
 `EMAIL_BACKEND` here is the console backend, so no message has ever reached an inbox; the company
-logo upload (it would overwrite the real file); and any production deployment steps.
+logo upload (it would overwrite the real file); the three services screens seen as a picture at
+desktop width (the same viewport refusal, so they were read from the DOM and from computed styles);
+and any production deployment steps.
 
 **Placeholder assets:** `frontend/public/images/{kampala,landlord,contracting}.jpg` are
 AI-generated stand-ins, not Mant Bridges photography. Replace them before launch.

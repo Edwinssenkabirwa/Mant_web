@@ -16,7 +16,7 @@ import ServiceBadge, { ICON_OPTIONS } from '../../components/services/ServiceBad
 import { parseBlocks } from '../../components/services/ServiceView.jsx'
 import { Callout, PageHeader, Panel } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
-import { Check, Field, FormGrid, Input, SelectOptions } from '../../components/ui/Form.jsx'
+import { Check, Field, FormAlert, FormGrid, Input, SelectOptions } from '../../components/ui/Form.jsx'
 import { ConfirmDialog } from '../../components/ui/Modal.jsx'
 import { Loading } from '../../components/ui/Feedback.jsx'
 import { dateTimeLabel } from '../../utils/format.js'
@@ -222,7 +222,6 @@ export default function ServiceForm() {
 
           <Panel title="The full description">
             <div className="stack">
-              <FormAlert error={save.error} />
               <Field
                 name="description"
                 label="Copy on the service page"
