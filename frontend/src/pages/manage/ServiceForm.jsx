@@ -9,6 +9,7 @@ import {
   uploadServiceImage,
 } from '../../api/services.js'
 import { lookups } from '../../api/site.js'
+import { describeError } from '../../api/client.js'
 import { useApi } from '../../hooks/useApi.js'
 import { useAction } from '../../hooks/useAction.js'
 import { useToast } from '../../context/ToastContext.jsx'
@@ -101,7 +102,17 @@ export default function ServiceForm() {
       }
       const saved = isEdit ? await updateService(Number(id), payload) : await createService(payload)
       if (!image) return saved
-      return uploadServiceImage(saved.id, image)
+      try {
+        return await uploadServiceImage(saved.id, image)
+      } catch (err) {
+        // The record is already stored, so take the desk to it instead of leaving a row behind a
+        // blank "New service" form that would create a second one on the next click.
+        toast.error(
+          `“${saved.name}” is saved, but its picture did not upload: ${describeError(err)} Open it again and save with the file.`
+        )
+        navigate(`/manage/services/${saved.id}/edit`)
+        throw err
+      }
     },
     {
       onDone: (saved) => {
@@ -354,7 +365,7 @@ export default function ServiceForm() {
               <p className="hint" style={{ margin: 0 }}>
                 {isEdit
                   ? 'The wording is saved first, then a newly picked picture replaces the old one. If the picture fails, the text is already stored — save again with just the file.'
-                  : 'The record is created first, then a newly picked picture is attached to it. If the picture fails, the service exists and you can upload from its edit screen.'}
+                  : 'The record is created first, then a newly picked picture is attached to it. If the picture fails, the service still exists and this form opens on it so you can try the file again.'}
               </p>
             </div>
           </Panel>
