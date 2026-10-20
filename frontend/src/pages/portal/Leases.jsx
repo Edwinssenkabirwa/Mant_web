@@ -56,7 +56,7 @@ export default function Leases() {
 
       {!active && !list.rows.length && !list.loading && !list.error ? (
         <Panel>
-          <EmptyState icon={Scale} title="No tenancy on this account" action={<Link to="/manage/properties" className="btn btn-outline">Browse listings</Link>}>
+          <EmptyState icon={Scale} title="No tenancy on this account" action={<Link to="/properties" className="btn btn-outline">Browse listings</Link>}>
             When a lease is signed and activated you will see the agreement, the rent due and every invoice raised
             under it here.
           </EmptyState>

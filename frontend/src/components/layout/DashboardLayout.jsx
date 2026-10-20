@@ -40,16 +40,22 @@ export function DashboardLayout() {
 
   const loadCounts = useCallback(async () => {
     if (!user) return
-    const tasks = [
-      invoiceSummary().then((data) => ({
-        overdue_invoices: data.overdue_count,
-        unpaid_invoices: data.outstanding_count,
-      })),
-      paymentSummary().then((data) => ({ pending_payments: data.pending_count })),
-      unreadCount().then((data) => ({ unread: data.unread })),
-    ]
+    const tasks = [unreadCount().then((data) => ({ unread: data.unread }))]
+    // The rent book summaries are the office's and the tenant's own; a landlord's portal
+    // reports its figures through /api/landlord/overview/, so do not ask for records he
+    // is not permitted to read.
     if (user.role === 'ADMIN') {
-      tasks.push(enquiryStats().then((data) => ({ new_enquiries: data.new ?? 0 })))
+      tasks.push(
+        invoiceSummary().then((data) => ({
+          overdue_invoices: data.overdue_count,
+          unpaid_invoices: data.outstanding_count,
+        })),
+        paymentSummary().then((data) => ({ pending_payments: data.pending_count })),
+        enquiryStats().then((data) => ({ new_enquiries: data.new ?? 0 })),
+      )
+    }
+    if (user.role === 'TENANT') {
+      tasks.push(invoiceSummary().then((data) => ({ unpaid_invoices: data.outstanding_count })))
     }
     const results = await Promise.allSettled(tasks)
     setCounts(

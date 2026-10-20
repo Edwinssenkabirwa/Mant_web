@@ -35,6 +35,18 @@ class IsAdminOrLandlord(BasePermission):
         return bool(user and user.is_authenticated and user.role in (Role.ADMIN, Role.LANDLORD))
 
 
+class IsAdminOrTenant(BasePermission):
+    """The rent book — invoices, payments, receipts, leases and statements — is read by the office
+    and by the tenant it concerns. A landlord's own view of his money is served from /api/landlord/,
+    which reports totals and trends without exposing another person's documents or details."""
+
+    message = "These records belong to the Mant Bridges office and the tenant they were issued to."
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.role in (Role.ADMIN, Role.TENANT))
+
+
 class IsAdminOrReadOnly(BasePermission):
     """Anyone authenticated may read; only admins may write."""
 

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { Breadcrumb, Callout } from '../ui/Blocks.jsx'
+import { ArcBand } from '../ui/Blocks.jsx'
 import { Button } from '../ui/Button.jsx'
 import ServiceBadge from './ServiceBadge.jsx'
 import { mediaUrl } from '../../utils/media.js'
@@ -9,8 +9,11 @@ import { mediaUrl } from '../../utils/media.js'
  * Service body copy is plain text an administrator writes in the dashboard, so it carries its own
  * light structure: a line starting "## " is a subheading, consecutive lines starting "- " are a
  * bullet list, and anything else is a paragraph.
+ *
+ * Exported because the services editor counts the blocks a draft will produce with these same
+ * rules, rather than keeping a second, drift-prone copy of them.
  */
-function parseBlocks(paragraphs = []) {
+export function parseBlocks(paragraphs = []) {
   const blocks = []
   const flushProse = (buffer) => {
     if (buffer.length) blocks.push({ kind: 'p', text: buffer.join(' ') })
@@ -61,27 +64,26 @@ export default function ServiceView({ record, others = [], preview = false }) {
 
   return (
     <div>
-      <section className="section-tight" style={{ background: 'var(--navy-800)', color: '#fff', padding: '40px 0' }}>
-        <div className="container stack">
-          <Breadcrumb
-            items={[
-              { label: 'Home', to: '/' },
-              { label: 'Services', to: '/services' },
-              { label: record.name },
-            ]}
-          />
+      <ArcBand
+        crumbs={[
+          { label: 'Home', to: '/' },
+          { label: 'Services', to: '/services' },
+          { label: record.name },
+        ]}
+        title={
           <div className="row" style={{ gap: 13, alignItems: 'center' }}>
             <ServiceBadge icon={record.icon} />
-            <h1 style={{ color: '#fff', margin: 0, maxWidth: '22ch' }}>{record.name}</h1>
+            <h1 style={{ margin: 0, maxWidth: '22ch' }}>{record.name}</h1>
           </div>
-          <p style={{ color: 'var(--navy-100)', maxWidth: '70ch', margin: 0 }}>{record.summary_text}</p>
-          {preview && !record.is_published ? (
-            <p className="hero-note" style={{ margin: 0 }}>
-              Preview of a draft — visitors cannot open this page until it is published.
-            </p>
-          ) : null}
-        </div>
-      </section>
+        }
+        lead={record.summary_text}
+      >
+        {preview && !record.is_published ? (
+          <p className="hero-note" style={{ margin: 0 }}>
+            Preview of a draft — visitors cannot open this page until it is published.
+          </p>
+        ) : null}
+      </ArcBand>
 
       <div className="container section-tight">
         <div className="grid grid-2" style={{ alignItems: 'start', gap: 32 }}>
@@ -138,12 +140,6 @@ export default function ServiceView({ record, others = [], preview = false }) {
           </div>
 
           <div className="stack">
-            {record.limitations ? (
-              <>
-                <h3>Honest limits</h3>
-                <Callout>{record.limitations}</Callout>
-              </>
-            ) : null}
             <div className="card">
               <div className="card-body stack stack-sm">
                 <h3 style={{ margin: 0 }}>Instructing us</h3>

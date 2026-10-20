@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.models import Role
-from apps.accounts.permissions import IsAdminOrLandlord
+from apps.accounts.permissions import IsAdminOrTenant, IsAdminRole
 from apps.billing.models import Invoice, Payment
 from apps.billing.services import generate_invoices_for_lease, tenant_statement
 from apps.leases.filters import LeaseFilter
@@ -17,9 +17,11 @@ from apps.leases.serializers import LeaseOptionSerializer, LeaseSerializer
 
 
 class LeaseViewSet(viewsets.ModelViewSet):
-    """Tenancies. Administrators see all, landlords their own, tenants their own."""
+    """Tenancies. The office sees all and a tenant sees his own. What a landlord is shown about
+    his tenancies is the occupancy summary at /api/landlord/overview/, not lease records naming a
+    tenant."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrTenant]
     serializer_class = LeaseSerializer
     filterset_class = LeaseFilter
     ordering_fields = ["start_date", "end_date", "monthly_rent", "created_at", "status"]
@@ -32,14 +34,12 @@ class LeaseViewSet(viewsets.ModelViewSet):
         ).prefetch_related("property__images")
         if user.role == Role.ADMIN:
             return queryset
-        if user.role == Role.LANDLORD:
-            return queryset.filter(landlord=user)
         return queryset.filter(tenant=user)
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy",
                            "generate_invoices"):
-            return [IsAuthenticated(), IsAdminOrLandlord()]
+            return [IsAuthenticated(), IsAdminRole()]
         return super().get_permissions()
 
     @action(detail=True, methods=["post"], url_path="generate-invoices")

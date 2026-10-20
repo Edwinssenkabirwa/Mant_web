@@ -17,6 +17,7 @@ from apps.billing.models import ZERO, Invoice, Payment
 from apps.core.helpers import to_decimal
 from apps.core.models import Company
 from apps.leases.models import Lease, add_months
+from apps.properties.models import Property
 
 OUTSTANDING = F("total") - F("amount_paid")
 
@@ -412,3 +413,87 @@ def scope_for(user):
         payments = payments.filter(tenant=user)
         leases = leases.filter(tenant=user)
     return invoices, payments, leases
+
+
+def landlord_overview(user, months=6):
+    """What an owner is shown about his own book: the collection trend and the occupancy of his
+    properties. Deliberately aggregate — the invoices, payments and receipts behind it name a
+    tenant and stay with the office.
+    """
+    today = timezone.localdate()
+    invoices = Invoice.objects.filter(landlord=user).exclude(status=Invoice.Status.CANCELLED)
+    payments = Payment.objects.filter(
+        Q(lease__landlord=user) | Q(invoice__landlord=user), status=Payment.Status.CONFIRMED
+    ).distinct()
+    properties = Property.objects.filter(owner=user)
+    leases = Lease.objects.filter(landlord=user)
+
+    invoiced_total = invoices.aggregate(total=Sum("total"))["total"] or ZERO
+    collected_total = payments.aggregate(total=Sum("amount"))["total"] or ZERO
+    unpaid = invoices.filter(total__gt=F("amount_paid"))
+    outstanding_total = unpaid.aggregate(total=Sum(OUTSTANDING))["total"] or ZERO
+    overdue_total = unpaid.filter(due_date__lt=today).aggregate(
+        total=Sum(OUTSTANDING)
+    )["total"] or ZERO
+
+    collected_by_property = {
+        row["lease__property_id"]: row["total"]
+        for row in payments.exclude(lease__isnull=True)
+        .values("lease__property_id").annotate(total=Sum("amount"))
+    }
+    outstanding_by_property = {
+        row["property_id"]: row["outstanding"]
+        for row in unpaid.values("property_id").annotate(outstanding=Sum(OUTSTANDING))
+    }
+
+    occupied = properties.filter(status=Property.Status.OCCUPIED).count()
+    lettable = properties.exclude(
+        status__in=[Property.Status.SOLD, Property.Status.OFF_MARKET]
+    ).count()
+
+    return {
+        "currency": Company.load().currency,
+        "as_of": today.isoformat(),
+        "collection": {
+            "invoiced": invoiced_total,
+            "collected": collected_total,
+            "outstanding": outstanding_total,
+            "overdue": overdue_total,
+            "collection_rate": (
+                round(float(collected_total) / float(invoiced_total) * 100, 2)
+                if invoiced_total else 0.0
+            ),
+            "monthly": _monthly_series(invoices, payments, months),
+        },
+        "occupancy": {
+            "properties": properties.count(),
+            "occupied": occupied,
+            "available": properties.filter(status=Property.Status.AVAILABLE).count(),
+            "pending": properties.filter(status=Property.Status.PENDING).count(),
+            "sold": properties.filter(status=Property.Status.SOLD).count(),
+            "off_market": properties.filter(status=Property.Status.OFF_MARKET).count(),
+            "rate": round(occupied / lettable * 100, 1) if lettable else 0.0,
+            "active_leases": leases.filter(status=Lease.Status.ACTIVE).count(),
+            "leases_expiring_soon": leases.filter(
+                status=Lease.Status.ACTIVE,
+                end_date__gte=today,
+                end_date__lte=today + timedelta(days=60),
+            ).count(),
+            "by_property": [
+                {
+                    "id": prop.id,
+                    "title": prop.title,
+                    "reference": prop.reference,
+                    "city": prop.city,
+                    "status": prop.status,
+                    "status_display": prop.get_status_display(),
+                    "listing_type": prop.listing_type,
+                    "listing_display": prop.get_listing_type_display(),
+                    "is_published": prop.is_published,
+                    "collected": collected_by_property.get(prop.id, ZERO),
+                    "outstanding": outstanding_by_property.get(prop.id, ZERO),
+                }
+                for prop in properties.order_by("-created_at")[:50]
+            ],
+        },
+    }

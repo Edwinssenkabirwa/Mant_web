@@ -21,6 +21,11 @@ const TONES = {
   SOLD: 'outline',
   PENDING_OFFER: 'warn',
   OFF_MARKET: 'outline',
+  // property recommendations — what the desk has done with an owner's offer
+  SUBMITTED: 'info',
+  IN_REVIEW: 'warn',
+  VERIFIED: 'ok',
+  DECLINED: 'bad',
   // enquiry
   NEW: 'red',
   IN_PROGRESS: 'info',

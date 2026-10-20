@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.properties.models import Enquiry, Property, PropertyImage
+from apps.properties.models import Enquiry, Property, PropertyImage, PropertyRecommendation
 
 
 class PropertyImageInline(admin.TabularInline):
@@ -41,3 +41,31 @@ class EnquiryAdmin(admin.ModelAdmin):
     search_fields = ("name", "email", "phone", "subject", "message")
     readonly_fields = ("created_at", "updated_at")
     date_hierarchy = "created_at"
+
+
+@admin.register(PropertyRecommendation)
+class PropertyRecommendationAdmin(admin.ModelAdmin):
+    list_display = ("title", "recommender", "listing_kind", "city", "price_expectation",
+                    "status", "submitted_at", "listing", "created_at")
+    list_filter = ("status", "listing_kind", "city", "property_type")
+    search_fields = ("title", "description", "address", "city", "district", "plot_reference",
+                     "recommender__full_name", "recommender__email")
+    readonly_fields = ("recommender", "status", "submitted_at", "decided_at", "decided_by",
+                       "listing", "created_at", "updated_at")
+    autocomplete_fields = ("recommender",)
+    date_hierarchy = "created_at"
+    fieldsets = (
+        ("From the owner", {"fields": ("recommender", "status", "submitted_at", "admin_note")}),
+        ("The property", {"fields": ("title", "description", "listing_kind", "property_type",
+                                     "bedrooms", "bathrooms", "parking_spaces", "area",
+                                     "area_unit")}),
+        ("Money", {"fields": ("price_expectation", "price_period", "currency")}),
+        ("Where it is", {"fields": ("address", "city", "district", "plot_reference")}),
+        ("Owner's side of it", {"fields": ("ownership", "occupancy", "paperwork",
+                                           "paperwork_note", "inspection_contact")}),
+        ("Outcome", {"fields": ("decided_at", "decided_by", "listing")}),
+    )
+
+    def has_add_permission(self, request):
+        # Recommendations start from an owner's portal or an account signup, never from the office.
+        return False

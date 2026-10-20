@@ -2,8 +2,9 @@
 
 The four headline names and their summary lines come from the printed brochures; the fifth,
 Land & property documentation, is the paperwork work the brochure lists alongside them. The
-longer body copy is written for owners and tenants rather than for the ledger, and every
-service keeps its "honest limits" note.
+longer body copy is written for owners and tenants rather than for the ledger, and it sells the
+work without a disclaimer section. Each service still stores its "honest limits" note for the
+dashboard, but the public pages no longer show it.
 
 Body copy uses a small convention the public page renders as sections: a line beginning "## "
 becomes a subheading, and a block whose lines begin "- " becomes a bullet list. Paragraphs are
@@ -50,7 +51,19 @@ SERVICES = [
             "reported back\n"
             "- Arrears handled early and in writing, before a small gap becomes a bad year\n"
             "- One named desk answering for the property, so instructions are not passed "
-            "sideways\n\n"
+            "sideways\n"
+            "- Rent released to you at the agreed time, so you can plan the investment that "
+            "comes after it\n"
+            "- Tenants do not all pay at once, so we top up from our own funds and pay you the "
+            "agreed amount on the agreed date\n"
+            "- An emergency fund to you on agreed terms, using the property as collateral\n"
+            "- Where you have a bank loan and your tenants pay inconsistently, we pay the bank "
+            "the agreed amount at the agreed time, so you live a stress-free life\n\n"
+            "These payouts are a written commitment made on the collection record of the "
+            "particular property, priced and agreed with you before we start. They are not a "
+            "bank product: the amount, the dates, the top-up limit and the collateral terms are "
+            "the ones in your management agreement, and nothing is promised that we have not "
+            "agreed and funded.\n\n"
             "## Qualities of a good landlord\n\n"
             "We work best with owners who treat the property as a business rather than a side "
             "hustle. In practice that means:\n\n"
@@ -214,6 +227,7 @@ SERVICES = [
     {
         "name": "Contracting & lobbying",
         "slug": "lobbying-and-advocacy",
+        "order": 4,
         "category": Service.Category.LOBBYING_ADVOCACY,
         "icon": Service.Icon.LANDMARK,
         "summary": (
@@ -303,14 +317,20 @@ SERVICES = [
             "solutions help you improve cash flow and protect your assets."
         ),
         "description": (
-            "Money that is owed is rarely held by one person — it is held by a chain. A payment "
-            "parked at an office, a cheque that never cleared, a client who keeps promising, a "
-            "file that has moved twice without anyone telling you, a contractor waiting on a "
-            "certificate nobody will sign. The debt is usually not disputed; it is stuck. And "
-            "every week it sits, it becomes harder to move. Chasing it yourself costs you days "
-            "you cannot bill for, and a relationship you may still want. This is what calls for a "
-            "professional like Mant Bridges — somebody to knock on every concerned office door and "
-            "press for the effective payment of our clients.\n\n"
+            "Most of the people who come to us have already done the work. A supplier bought the "
+            "stock on their own money and delivered it. A mason finished the wall and was told "
+            "the certificate was coming. A consultant billed for the work, waited, and is still "
+            "waiting. They were paid nothing. Money that is owed is rarely held by one person — "
+            "it is held by a chain: a payment parked at an office, a cheque that never cleared, a "
+            "client who keeps promising, a file that has moved twice without anyone telling you, "
+            "a contractor waiting on a certificate nobody will sign. The debt is usually not "
+            "disputed; it is stuck. And every week it sits, it becomes harder to move. Chasing it "
+            "yourself costs you days you cannot bill for, and a relationship you may still want. "
+            "This is what calls for a professional like Mant Bridges — somebody to knock on every "
+            "concerned office door and press for the effective payment of our clients.\n\n"
+            "We come in to guarantee these individuals' progress — not the sum at the end of it, "
+            "which no honest agent can promise, but that the file starts moving and keeps moving "
+            "until it is settled or we have told you plainly why it will not be.\n\n"
             "## Knocking on every concerned office door\n\n"
             "- We take the file, work out which offices and which people hold the money, and "
             "put a name to each one\n"
@@ -336,12 +356,7 @@ SERVICES = [
             "- Contact reports as we go, so you are never left wondering whether anything "
             "happened\n"
             "- A clear recommendation when a debt is not worth the cost of chasing — and we "
-            "will say it\n\n"
-            "## The line we hold\n\n"
-            "Ethical recovery is the only kind that survives scrutiny. We deal with the debtor "
-            "directly and in writing, we do not threaten, we do not contact employers, family "
-            "or neighbours to pressure a payment, and we never present ourselves as a court, a "
-            "police officer or your advocate."
+            "will say it."
         ),
         "highlights": [
             "Trade debts, unpaid fees, retention sums and contract balances",
@@ -364,7 +379,7 @@ SERVICES = [
     {
         "name": "Land & property documentation",
         "slug": "land-documentation",
-        "order": 4,
+        "order": 3,
         "category": Service.Category.LAND_DOCUMENTATION,
         "icon": Service.Icon.DOCUMENT,
         "summary": (
@@ -413,16 +428,7 @@ SERVICES = [
             "- Penalties, back duty and demurrage at the offices when a missed step is only "
             "found at transfer\n"
             "- The embarrassment of explaining, in front of a bank or a court, that nobody "
-            "checked\n\n"
-            "## Where our role stops\n\n"
-            "We prepare, verify, chase and hand over. The offices and the professionals do the "
-            "parts the law reserves to them.\n\n"
-            "- Registration, transfer and the issue of instruments belong to the land office "
-            "and a licensed advocate\n"
-            "- Valuation for a bank belongs to a registered valuer\n"
-            "- Beacons and boundary plans belong to a licensed surveyor\n"
-            "- Where a document cannot be verified we say the transaction should stop, "
-            "whatever it costs us in instruction"
+            "checked."
         ),
         "highlights": [
             "Official search applications prepared and chased at the land office",

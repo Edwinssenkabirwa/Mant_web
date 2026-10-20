@@ -1,6 +1,6 @@
 import { Mail, MapPin, Phone, Star } from 'lucide-react'
 import { useLookups } from '../../context/LookupContext.jsx'
-import { Breadcrumb, Callout, Panel } from '../../components/ui/Blocks.jsx'
+import { ArcBand, Callout, Panel } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import EnquiryForm from '../../components/properties/EnquiryForm.jsx'
 import { Skeleton } from '../../components/ui/Feedback.jsx'
@@ -11,17 +11,12 @@ export default function Contact() {
 
   return (
     <div>
-      <section className="section-tight" style={{ padding: '40px 0 12px' }}>
-        <div className="container stack">
-          <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'Contact' }]} />
-          <p className="eyebrow">Contact</p>
-          <h1>Talk to the property desk</h1>
-          <p className="lead" style={{ maxWidth: '72ch' }}>
-            Enquiries about a listing, a property you want managed, an arrears instruction or works on a building all
-            come to the same team. Use the form and we will reply by email or phone.
-          </p>
-        </div>
-      </section>
+      <ArcBand
+        crumbs={[{ label: 'Home', to: '/' }, { label: 'Contact' }]}
+        eyebrow="Contact"
+        title="Talk to the property desk"
+        lead="Enquiries about a listing, a property you want managed, an arrears instruction or works on a building all come to the same team. Use the form and we will reply by email or phone."
+      />
 
       <section className="section-tight">
         <div className="container">

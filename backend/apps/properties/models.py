@@ -253,3 +253,145 @@ class Enquiry(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} - {self.subject or self.email}"
+
+
+class PropertyRecommendation(TimeStampedModel):
+    """A property an owner puts in front of the Mant Bridges desk.
+
+    Only the office turns a recommendation into a listing, so nothing typed here reaches the
+    public catalogue until an administrator verifies it. The detail fields stay optional because
+    an account opens with an empty draft that the owner fills in when he gets to it.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        SUBMITTED = "SUBMITTED", "Submitted to the desk"
+        IN_REVIEW = "IN_REVIEW", "In due diligence"
+        VERIFIED = "VERIFIED", "Verified and listed"
+        DECLINED = "DECLINED", "Declined"
+
+    class ListingKind(models.TextChoices):
+        RENT = "RENT", "To rent"
+        SALE = "SALE", "For sale"
+        BOTH = "BOTH", "For sale and to rent"
+
+    class Ownership(models.TextChoices):
+        OWN = "OWN", "I own it"
+        FAMILY = "FAMILY", "Family property"
+        AGENT = "AGENT", "I act for the owner"
+        OTHER = "OTHER", "Another arrangement"
+
+    class Occupancy(models.TextChoices):
+        VACANT = "VACANT", "Empty and ready"
+        OCCUPIED = "OCCUPIED", "Tenants in place"
+        UNDER_CONSTRUCTION = "UNDER_CONSTRUCTION", "Still being built"
+        UNKNOWN = "UNKNOWN", "Not sure"
+
+    class Paperwork(models.TextChoices):
+        TITLE = "TITLE", "Title / lease in hand"
+        SALE_LETTER = "SALE_LETTER", "Sale letter or agreement only"
+        APPLIED = "APPLIED", "Search or application in progress"
+        NONE = "NONE", "Nothing yet"
+        UNKNOWN = "UNKNOWN", "Not sure"
+
+    recommender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="property_recommendations",
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    listing_kind = models.CharField(
+        max_length=10, choices=ListingKind.choices, blank=True, default=""
+    )
+    property_type = models.CharField(
+        max_length=20, choices=Property.PropertyType.choices, blank=True, default=""
+    )
+    bedrooms = models.PositiveIntegerField(blank=True, null=True)
+    bathrooms = models.PositiveIntegerField(blank=True, null=True)
+    parking_spaces = models.PositiveIntegerField(blank=True, null=True)
+    area = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    area_unit = models.CharField(max_length=20, default="sqm", blank=True)
+    price_expectation = models.DecimalField(
+        max_digits=14, decimal_places=2, blank=True, null=True,
+        help_text="What the owner expects, not a valuation by Mant Bridges.",
+    )
+    price_period = models.CharField(
+        max_length=10, choices=Property.PricePeriod.choices, blank=True, default=""
+    )
+    currency = models.CharField(max_length=10, default="UGX", blank=True)
+    address = models.CharField(max_length=255, blank=True, default="")
+    city = models.CharField(max_length=120, blank=True, default="")
+    district = models.CharField(max_length=120, blank=True, default="")
+    plot_reference = models.CharField(
+        max_length=120, blank=True, default="",
+        help_text="Plot number, block or title number where one exists.",
+    )
+    ownership = models.CharField(
+        max_length=12, choices=Ownership.choices, blank=True, default=""
+    )
+    occupancy = models.CharField(
+        max_length=20, choices=Occupancy.choices, blank=True, default=""
+    )
+    paperwork = models.CharField(
+        max_length=16, choices=Paperwork.choices, blank=True, default=""
+    )
+    paperwork_note = models.TextField(
+        blank=True, default="",
+        help_text="Documents held, what is missing, and anything the desk needs to know "
+                  "before it starts due diligence.",
+    )
+    inspection_contact = models.CharField(
+        max_length=120, blank=True, default="",
+        help_text="Who to call to view the property, and how to reach them.",
+    )
+    status = models.CharField(
+        max_length=15, choices=Status.choices, default=Status.DRAFT, db_index=True
+    )
+    submitted_at = models.DateTimeField(blank=True, null=True)
+    decided_at = models.DateTimeField(blank=True, null=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="recommendations_decided",
+        blank=True,
+        null=True,
+    )
+    admin_note = models.TextField(blank=True, default="")
+    listing = models.OneToOneField(
+        Property,
+        on_delete=models.SET_NULL,
+        related_name="recommendation",
+        blank=True,
+        null=True,
+        help_text="The listing created when the desk verified this recommendation.",
+    )
+
+    REQUIRED_FOR_SUBMIT = (
+        ("title", "A short name for the property"),
+        ("description", "What the property is, in a few sentences"),
+        ("listing_kind", "Whether it is for sale, to rent, or both"),
+        ("property_type", "The kind of property"),
+        ("address", "Where it is — street, zone or landmark"),
+        ("city", "The town or district it sits in"),
+        ("ownership", "How the property relates to you"),
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name_plural = "Property recommendations"
+        indexes = [
+            models.Index(fields=["recommender", "status"]),
+            models.Index(fields=["status", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return self.title or f"Recommendation #{self.pk} for {self.recommender}"
+
+    @property
+    def is_editable(self):
+        """The owner may still change anything up to the moment the desk verifies or declines it."""
+        return self.status in (self.Status.DRAFT, self.Status.SUBMITTED, self.Status.IN_REVIEW)
+
+    def missing_for_submit(self):
+        return [label for field, label in self.REQUIRED_FOR_SUBMIT if not getattr(self, field)]

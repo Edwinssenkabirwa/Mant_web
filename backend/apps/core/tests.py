@@ -1,8 +1,11 @@
-"""Tests for admin-managed services, the public newsletter API and email campaigns."""
+"""Tests for admin-managed services, the newsletter and email campaigns, the landlord
+portal's access rules and the property recommendation queue."""
 import json
+import os
 import re
-from base64 import b64decode
-from datetime import timedelta
+import zlib
+from base64 import a85decode, b64decode
+from datetime import date, timedelta
 from io import StringIO
 from smtplib import SMTPServerDisconnected
 
@@ -18,14 +21,20 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Role, User
+from apps.billing.models import Invoice, Payment
 from apps.core.models import (
+    Company,
     EmailCampaign,
     EmailCampaignRecipient,
     NewsletterSubscription,
     Service,
 )
 from apps.core.services import campaigns, newsletter
+from apps.core.services.documents import render_invoice_pdf, render_receipt_pdf
 from apps.core.testing import ApiTestCase
+from apps.leases.models import Lease
+from apps.messaging.services import get_or_create_conversation
+from apps.properties.models import Enquiry, Property, PropertyRecommendation
 
 TINY_PNG = b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -214,11 +223,26 @@ class SeedServicesCommandTests(ApiTestCase):
             [
                 "Rent collection & property management",
                 "Real estate",
-                "Contracting & lobbying",
                 "Land & property documentation",
+                "Contracting & lobbying",
                 "Debt recovery",
             ],
         )
+
+    def test_rent_desk_payouts_are_published_with_their_terms(self):
+        """The dated-promise bullets only read honestly next to the terms that bound them."""
+        call_command("seed_services", verbosity=0)
+        service = Service.objects.get(slug="property-management")
+        text = f"{service.summary} {service.description}".lower()
+        self.assertIn("using the property as collateral", text)
+        self.assertIn("stress-free life", text)
+        self.assertIn("not a bank product", text)
+
+    def test_debt_recovery_guarantees_progress_not_the_sum(self):
+        call_command("seed_services", verbosity=0)
+        service = Service.objects.get(slug="debt-recovery")
+        self.assertIn("guarantee these individuals' progress", service.description)
+        self.assertIn("no outcome can be guaranteed", service.limitations.lower())
 
     def test_icons_stay_inside_the_whitelist_the_frontend_renders(self):
         call_command("seed_services", verbosity=0)
@@ -989,3 +1013,555 @@ class EmailAdminApiTests(ApiTestCase):
             console = self.client.get(f"{self.CAMPAIGNS}stats/").json()
             self.assertEqual(console["email_backend"], "console.EmailBackend")
             self.assertFalse(console["sends_real_mail"])
+
+
+def last_month():
+    """(first day, last day) of the month before this one — always inside the trend window."""
+    this_month = timezone.localdate().replace(day=1)
+    previous = this_month - timedelta(days=1)
+    return previous.replace(day=1), previous
+
+
+class LandlordPortalAccessTests(ApiTestCase):
+    """What an owner may see of his own book: the trend and the occupancy, never the office's
+    invoices, receipts or a tenant's details."""
+
+    OVERVIEW = "/api/landlord/overview/"
+    RENT_BOOK = [
+        "/api/invoices/", "/api/payments/", "/api/receipts/", "/api/leases/",
+        "/api/analytics/", "/api/statements/",
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email="office@example.test", password="Passw0rd!", role=Role.ADMIN,
+            first_name="Ada", last_name="Admin",
+        )
+        self.landlord = User.objects.create_user(
+            email="owner@example.test", password="Passw0rd!", role=Role.LANDLORD,
+            first_name="Len", last_name="Owner", phone="+256700000001",
+        )
+        self.neighbour = User.objects.create_user(
+            email="neighbour@example.test", password="Passw0rd!", role=Role.LANDLORD,
+            first_name="Nina", last_name="Owner",
+        )
+        self.tenant = User.objects.create_user(
+            email="renter@example.test", password="Passw0rd!", role=Role.TENANT,
+            first_name="Tom", last_name="Renter", phone="+256700000002",
+        )
+
+    def let_property(self, landlord, title, rent, paid=None):
+        """One occupied unit, one tenancy, one invoice for last month and part-payment against it."""
+        month_start, month_end = last_month()
+        prop = Property.objects.create(
+            owner=landlord, title=title, description="A test unit.", price=rent,
+            address="1 Test Road", city="Kampala", status=Property.Status.OCCUPIED,
+        )
+        lease = Lease.objects.create(
+            property=prop, tenant=self.tenant, landlord=landlord,
+            start_date=month_start.replace(day=1),
+            end_date=month_end.replace(year=month_end.year + 5), monthly_rent=rent,
+        )
+        invoice = Invoice.objects.create(
+            lease=lease, property=prop, tenant=self.tenant, landlord=landlord,
+            period_start=month_start, period_end=month_end,
+            issue_date=month_start, due_date=month_start + timedelta(days=4),
+            rent_amount=rent,
+        )
+        if paid:
+            Payment.objects.create(
+                invoice=invoice, lease=lease, tenant=self.tenant, amount=paid,
+                status=Payment.Status.CONFIRMED, paid_on=month_start + timedelta(days=2),
+                recorded_by=self.admin, confirmed_by=self.admin,
+            )
+        return prop, lease, invoice
+
+    def test_a_landlord_is_locked_out_of_every_rent_book_endpoint(self):
+        self.let_property(self.landlord, "Nakawa apartment", 1_000_000, paid=500_000)
+        self.client.force_authenticate(self.landlord)
+        for path in self.RENT_BOOK:
+            self.assertEqual(self.client.get(path).status_code, 403, path)
+
+    def test_the_office_and_the_tenant_still_reach_the_rent_book(self):
+        self.let_property(self.landlord, "Nakawa apartment", 1_000_000, paid=500_000)
+        for user in (self.admin, self.tenant):
+            self.client.force_authenticate(user)
+            for path in self.RENT_BOOK:
+                self.assertEqual(self.client.get(path).status_code, 200, f"{user.role} {path}")
+
+    def test_a_landlord_cannot_write_money_records_or_download_tenant_documents(self):
+        _, _, invoice = self.let_property(self.landlord, "Nakawa apartment", 1_000_000)
+        payment = Payment.objects.create(
+            invoice=invoice, lease=invoice.lease, tenant=self.tenant, amount=250_000,
+            paid_on=last_month()[0] + timedelta(days=3),
+        )
+        self.client.force_authenticate(self.landlord)
+        self.assertEqual(self.client.post("/api/invoices/", {}, format="json").status_code, 403)
+        self.assertEqual(
+            self.client.post(f"/api/payments/{payment.pk}/confirm/", {}, format="json").status_code,
+            403,
+        )
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.Status.PENDING)
+        self.assertEqual(self.client.get(f"/api/invoices/{invoice.pk}/pdf/").status_code, 403)
+
+    def test_overview_reports_his_own_collection_and_occupancy_only(self):
+        self.let_property(self.landlord, "Nakawa apartment", 1_000_000, paid=600_000)
+        self.let_property(self.neighbour, "Entebbe bungalow", 4_000_000, paid=4_000_000)
+        self.client.force_authenticate(self.landlord)
+
+        body = self.client.get(self.OVERVIEW).json()
+        self.assertEqual(float(body["collection"]["collected"]), 600_000)
+        self.assertEqual(float(body["collection"]["outstanding"]), 400_000)
+        self.assertEqual(body["occupancy"]["properties"], 1)
+        self.assertEqual(body["occupancy"]["occupied"], 1)
+        self.assertEqual([row["title"] for row in body["occupancy"]["by_property"]],
+                         ["Nakawa apartment"])
+
+        # The trend is the point of the page, and it must carry the month it belongs to.
+        billed_month = last_month()[0].strftime("%Y-%m")
+        rows = [row for row in body["collection"]["monthly"] if row["month"] == billed_month]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(float(rows[0]["invoiced"]), 1_000_000)
+        self.assertEqual(float(rows[0]["collected"]), 600_000)
+
+        joined = json.dumps(body)
+        for secret in ("Tom Renter", "renter@example.test", "+256700000002", "Entebbe bungalow"):
+            self.assertNotIn(secret, joined)
+
+    def test_overview_is_closed_to_every_other_role(self):
+        self.client.credentials()
+        self.assertEqual(self.client.get(self.OVERVIEW).status_code, 401)
+        for other in (self.admin, self.tenant):
+            self.client.force_authenticate(other)
+            self.assertEqual(self.client.get(self.OVERVIEW).status_code, 403)
+
+    def test_a_landlords_inbox_excludes_threads_that_hold_a_tenant(self):
+        get_or_create_conversation(
+            participants=[self.landlord, self.admin], subject="Rent desk", created_by=self.admin,
+        )
+        get_or_create_conversation(
+            participants=[self.landlord, self.admin, self.tenant],
+            subject="Arrears call", created_by=self.admin,
+        )
+        self.client.force_authenticate(self.landlord)
+        subjects = [row["subject"] for row in self.client.get("/api/conversations/").json()["results"]]
+        self.assertEqual(subjects, ["Rent desk"])
+
+        self.client.force_authenticate(self.admin)
+        admin_subjects = [
+            row["subject"] for row in self.client.get("/api/conversations/").json()["results"]
+        ]
+        self.assertEqual(sorted(admin_subjects), ["Arrears call", "Rent desk"])
+
+
+class PropertyRecommendationTests(ApiTestCase):
+    """Owners recommend, the office verifies. A recommendation becomes a public listing
+    only when an administrator says so — never when the owner types it in."""
+
+    OWN = "/api/landlord/recommendations/"
+    QUEUE = "/api/manage/recommendations/"
+    CATALOGUE = "/api/manage/properties/"
+
+    COMPLETE = {
+        "title": "Kisenyi two-bedroom maisonette",
+        "description": "A finished maisonette on a quiet street, close to the town centre.",
+        "listing_kind": "RENT",
+        "property_type": "HOUSE",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "area": 140,
+        "address": "Plot 14, Kisenyi Road",
+        "city": "Kampala",
+        "district": "Central",
+        "ownership": "OWN",
+        "occupancy": "VACANT",
+        "paperwork": "TITLE",
+        "price_expectation": 1800000,
+        "price_period": "MONTHLY",
+        "currency": "UGX",
+        "inspection_contact": "Call the owner on +256 700 000 001",
+    }
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email="desk@example.test", password="Passw0rd!", role=Role.ADMIN,
+            first_name="Ada", last_name="Admin",
+        )
+        self.landlord = User.objects.create_user(
+            email="owner@example.test", password="Passw0rd!", role=Role.LANDLORD,
+            first_name="Len", last_name="Owner", phone="+256700000001",
+        )
+        self.neighbour = User.objects.create_user(
+            email="neighbour@example.test", password="Passw0rd!", role=Role.LANDLORD,
+            first_name="Nina", last_name="Owner",
+        )
+
+    def sent(self, user=None, **overrides):
+        """A recommendation the owner has already handed to the desk."""
+        answers = dict(self.COMPLETE)
+        answers.update(overrides)
+        return PropertyRecommendation.objects.create(
+            recommender=user or self.landlord, status=PropertyRecommendation.Status.SUBMITTED,
+            submitted_at=timezone.now(), **answers
+        )
+
+    def signup_draft(self, user):
+        return PropertyRecommendation.objects.get(recommender=user)
+
+    def ids(self, response):
+        return [row["id"] for row in response.json()["results"]]
+
+    # --- what an account opening leaves behind --------------------------------
+    def test_a_new_landlord_finds_an_empty_draft_and_a_new_tenant_an_enquiry(self):
+        fresh = User.objects.create_user(
+            email="newowner@example.test", password="Passw0rd!", role=Role.LANDLORD,
+            first_name="New", last_name="Owner",
+        )
+        renter = User.objects.create_user(
+            email="newrenter@example.test", password="Passw0rd!", role=Role.TENANT,
+            first_name="New", last_name="Renter", phone="+256700000009",
+        )
+        drafts = PropertyRecommendation.objects.filter(recommender=fresh)
+        self.assertEqual(drafts.count(), 1)
+        self.assertEqual(drafts.first().status, PropertyRecommendation.Status.DRAFT)
+        self.assertEqual(drafts.first().title, "")
+
+        enquiries = Enquiry.objects.filter(email=renter.email)
+        self.assertEqual(enquiries.count(), 1)
+        self.assertEqual(enquiries.first().status, Enquiry.Status.NEW)
+        self.assertIn("property brief", enquiries.first().subject.lower())
+
+    def test_an_administrator_opens_without_paperwork(self):
+        # One draft each for the two landlords created above, and nothing for the administrator.
+        self.assertEqual(PropertyRecommendation.objects.count(), 2)
+        self.assertEqual(
+            PropertyRecommendation.objects.filter(recommender=self.admin).count(), 0
+        )
+        self.assertEqual(Enquiry.objects.count(), 0)
+
+    # --- the owner's own copies ----------------------------------------------
+    def test_the_owner_sees_his_own_drafts_and_nothing_else(self):
+        self.sent(self.neighbour)
+        self.client.force_authenticate(self.landlord)
+        rows = self.client.get(self.OWN).json()["results"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["status"], "DRAFT")
+        self.assertEqual(rows[0]["recommender"], self.landlord.pk)
+
+    def test_the_queue_starts_where_the_owners_work_stops(self):
+        draft = self.signup_draft(self.landlord)
+        submitted = self.sent()
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.ids(self.client.get(self.QUEUE)), [submitted.pk])
+        self.assertIn(draft.pk, self.ids(self.client.get(self.QUEUE + "?status=DRAFT")))
+
+    def test_a_half_filled_recommendation_is_not_sent(self):
+        self.client.force_authenticate(self.landlord)
+        created = self.client.post(self.OWN, {"title": "Something on Nakawa"}, format="json")
+        self.assertEqual(created.status_code, 201, created.json())
+        pk = created.json()["id"]
+        refused = self.client.post(f"{self.OWN}{pk}/submit/", {}, format="json")
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("Still needed", refused.json()["detail"])
+        self.assertEqual(
+            PropertyRecommendation.objects.get(pk=pk).status,
+            PropertyRecommendation.Status.DRAFT,
+        )
+
+    def test_a_complete_recommendation_reaches_the_desk(self):
+        self.client.force_authenticate(self.landlord)
+        created = self.client.post(self.OWN, self.COMPLETE, format="json")
+        self.assertEqual(created.status_code, 201, created.json())
+        pk = created.json()["id"]
+        sent = self.client.post(f"{self.OWN}{pk}/submit/", {}, format="json")
+        self.assertEqual(sent.status_code, 200, sent.json())
+        self.assertEqual(sent.json()["status"], "SUBMITTED")
+        self.assertIsNotNone(sent.json()["submitted_at"])
+
+        self.client.force_authenticate(self.admin)
+        self.assertIn(pk, self.ids(self.client.get(self.QUEUE)))
+
+    def test_an_owner_cannot_put_a_listing_into_the_catalogue_himself(self):
+        own = Property.objects.create(
+            owner=self.landlord, title="His own unit", description="Test.", price=900_000,
+            address="1 Road", city="Kampala",
+        )
+        self.client.force_authenticate(self.landlord)
+        self.assertEqual(self.client.get(self.CATALOGUE).status_code, 200)
+        payload = {"title": "Published by me", "description": "Test.", "price": 100,
+                   "address": "1 Road", "city": "Kampala"}
+        self.assertEqual(self.client.post(self.CATALOGUE, payload, format="json").status_code, 403)
+        self.assertEqual(
+            self.client.patch(f"{self.CATALOGUE}{own.pk}/", {"title": "Renamed"},
+                              format="json").status_code, 403,
+        )
+        self.assertEqual(self.client.delete(f"{self.CATALOGUE}{own.pk}/").status_code, 403)
+        self.assertEqual(
+            self.client.post(f"{self.CATALOGUE}{own.pk}/images/").status_code, 403,
+        )
+        own.refresh_from_db()
+        self.assertEqual(own.title, "His own unit")
+
+    def test_one_owners_recommendation_is_invisible_to_the_next(self):
+        other = self.sent(self.neighbour)
+        self.client.force_authenticate(self.landlord)
+        self.assertEqual(self.client.get(f"{self.OWN}{other.pk}/").status_code, 404)
+        self.assertEqual(
+            self.client.patch(f"{self.OWN}{other.pk}/", {"title": "Mine now"},
+                              format="json").status_code, 404,
+        )
+        self.assertEqual(
+            PropertyRecommendation.objects.get(pk=other.pk).title,
+            "Kisenyi two-bedroom maisonette",
+        )
+
+    def test_an_owner_cannot_decide_his_own_recommendation(self):
+        recommendation = self.sent()
+        self.client.force_authenticate(self.landlord)
+        for verb in ("verify", "decline", "review"):
+            self.assertEqual(
+                self.client.post(f"{self.OWN}{recommendation.pk}/{verb}/", {},
+                                 format="json").status_code, 404, verb,
+            )
+        self.assertEqual(self.client.get(self.QUEUE).status_code, 403)
+        recommendation.refresh_from_db()
+        self.assertEqual(recommendation.status, PropertyRecommendation.Status.SUBMITTED)
+
+    # --- the desk's side ------------------------------------------------------
+    def test_verifying_publishes_a_listing_owned_by_the_landlord(self):
+        recommendation = self.sent()
+        self.client.force_authenticate(self.admin)
+        answer = self.client.post(f"{self.QUEUE}{recommendation.pk}/verify/", {}, format="json")
+        self.assertEqual(answer.status_code, 200, answer.json())
+        body = answer.json()
+        self.assertEqual(body["status"], "VERIFIED")
+        self.assertEqual(body["decided_by_name"], "Ada Admin")
+
+        listing = Property.objects.get(pk=body["listing"])
+        self.assertEqual(listing.owner, self.landlord)
+        self.assertTrue(listing.is_published)
+        self.assertEqual(listing.status, Property.Status.AVAILABLE)
+        self.assertEqual(float(listing.price), 1800000)
+        self.assertEqual(listing.listing_type, Property.ListingType.RENT)
+        self.assertEqual(listing.property_type, Property.PropertyType.HOUSE)
+        self.assertEqual(listing.city, "Kampala")
+        self.assertEqual(listing.reference, f"MB-P{listing.pk:05d}")
+
+        public = APIClient().get("/api/properties/").json()["results"]
+        self.assertIn(listing.slug, [row["slug"] for row in public])
+
+    def test_verifying_twice_does_not_make_two_listings(self):
+        recommendation = self.sent()
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(
+            self.client.post(f"{self.QUEUE}{recommendation.pk}/verify/", {}, format="json").status_code,
+            200,
+        )
+        again = self.client.post(f"{self.QUEUE}{recommendation.pk}/verify/", {}, format="json")
+        self.assertEqual(again.status_code, 400)
+        self.assertEqual(Property.objects.filter(title=recommendation.title).count(), 1)
+
+    def test_a_sale_and_rent_offer_needs_the_desk_to_pick_one(self):
+        recommendation = self.sent(listing_kind=PropertyRecommendation.ListingKind.BOTH)
+        self.client.force_authenticate(self.admin)
+        blocked = self.client.post(f"{self.QUEUE}{recommendation.pk}/verify/", {}, format="json")
+        self.assertEqual(blocked.status_code, 400)
+        self.assertIn("sale and to rent", blocked.json()["detail"])
+
+        chosen = self.client.post(
+            f"{self.QUEUE}{recommendation.pk}/verify/",
+            {"listing_type": "SALE", "price": 250000000, "currency": "UGX"}, format="json",
+        )
+        self.assertEqual(chosen.status_code, 200, chosen.json())
+        listing = Property.objects.get(pk=chosen.json()["listing"])
+        self.assertEqual(listing.listing_type, Property.ListingType.SALE)
+        self.assertEqual(float(listing.price), 250000000)
+
+    def test_a_draft_cannot_be_verified_and_a_price_is_needed_to_publish(self):
+        self.client.force_authenticate(self.admin)
+        draft = self.signup_draft(self.landlord)
+        self.assertEqual(
+            self.client.post(f"{self.QUEUE}{draft.pk}/verify/", {}, format="json").status_code, 400,
+        )
+        unpriced = self.sent(price_expectation=None)
+        refused = self.client.post(f"{self.QUEUE}{unpriced.pk}/verify/", {}, format="json")
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("price", refused.json()["detail"].lower())
+
+    def test_the_desk_can_correct_a_recommendation_before_publishing_it(self):
+        recommendation = self.sent()
+        self.client.force_authenticate(self.admin)
+        corrected = self.client.patch(
+            f"{self.QUEUE}{recommendation.pk}/",
+            {"title": "Kisenyi maisonette, two bedrooms", "admin_note": "Checked the title."},
+            format="json",
+        )
+        self.assertEqual(corrected.status_code, 200, corrected.json())
+        self.assertEqual(corrected.json()["admin_note"], "Checked the title.")
+
+        published = self.client.post(
+            f"{self.QUEUE}{recommendation.pk}/verify/", {"price": 2000000}, format="json",
+        )
+        self.assertEqual(published.status_code, 200, published.json())
+        listing = Property.objects.get(pk=published.json()["listing"])
+        self.assertEqual(listing.title, "Kisenyi maisonette, two bedrooms")
+        self.assertEqual(float(listing.price), 2000000)
+
+    def test_declining_records_the_note_and_locks_the_form(self):
+        recommendation = self.sent()
+        self.client.force_authenticate(self.admin)
+        thin = self.client.post(f"{self.QUEUE}{recommendation.pk}/decline/", {"note": "no"},
+                                format="json")
+        self.assertEqual(thin.status_code, 400)
+        answer = self.client.post(
+            f"{self.QUEUE}{recommendation.pk}/decline/",
+            {"note": "The title is registered to a third party, so we cannot list it."},
+            format="json",
+        )
+        self.assertEqual(answer.status_code, 200, answer.json())
+        self.assertEqual(answer.json()["status"], "DECLINED")
+
+        self.client.force_authenticate(self.landlord)
+        later = self.client.patch(f"{self.OWN}{recommendation.pk}/", {"title": "Changed"},
+                                  format="json")
+        self.assertEqual(later.status_code, 400)
+        self.assertIn("decided", later.json()["detail"].lower())
+        self.assertEqual(
+            PropertyRecommendation.objects.get(pk=recommendation.pk).title,
+            "Kisenyi two-bedroom maisonette",
+        )
+
+    def test_a_draft_the_owner_never_fills_in_can_be_thrown_away(self):
+        draft = self.signup_draft(self.landlord)
+        submitted = self.sent()
+        self.client.force_authenticate(self.landlord)
+        self.assertEqual(self.client.delete(f"{self.OWN}{submitted.pk}/").status_code, 400)
+        self.assertEqual(self.client.delete(f"{self.OWN}{draft.pk}/").status_code, 204)
+        self.assertFalse(PropertyRecommendation.objects.filter(pk=draft.pk).exists())
+
+    def test_the_desk_reports_what_is_waiting(self):
+        self.sent()
+        self.sent(self.neighbour, title="Entebbe half a hectare", listing_kind="SALE",
+                  property_type="LAND", price_expectation=90000000, price_period="ONE_OFF")
+        self.client.force_authenticate(self.admin)
+        body = self.client.get(self.QUEUE + "stats/").json()
+        self.assertEqual(body["SUBMITTED"], 2)
+        self.assertEqual(body["DRAFT"], 2)  # one waiting on each owner since their accounts opened
+        self.assertEqual(body["total"], 4)
+        self.assertEqual(body["waiting"], 4)
+
+
+def drawn_text(pdf_bytes):
+    """Everything a PDF puts on paper, as plain text.
+
+    ReportLab writes its page content as ASCII-85 then Flate, so the strings the
+    letterhead draws are not readable in the raw file.
+    """
+    chunks = []
+    for match in re.finditer(rb"stream\r?\n(.*?)endstream", pdf_bytes, re.S):
+        body = match.group(1).rstrip()
+        for decode in (
+            lambda data: zlib.decompress(a85decode(data, adobe=True)),
+            zlib.decompress,
+        ):
+            try:
+                chunks.append(decode(body))
+                break
+            except Exception:
+                continue
+    return b"\n".join(chunks).decode("latin-1")
+
+
+class LetterheadTests(ApiTestCase):
+    """Every document the platform prints goes out on the same letterhead: the logo lockup
+    and the contact block across the top, the navy rule with its red end-cap, the mark behind
+    the page and the PROFESSIONAL / TRUSTED / RESULT DRIVEN band along the foot."""
+
+    def setUp(self):
+        super().setUp()
+        self.company = Company.load()
+        self.company.name = "Mant Bridges LTD"
+        self.company.tagline = "Bridging Gaps"
+        self.company.email = "desk@mantbridges.test"
+        self.company.phone = "+256700000000"
+        self.company.alt_phone = "+256700000001"
+        self.company.address = "Cham Towers, Kampala Road"
+        self.company.city = "Kampala"
+        self.company.website = "https://mantbridges.test"
+        self.company.logo = None
+        self.company.save()
+
+    def sample(self, renderer):
+        return renderer({
+            "number": "MB-TEST-0001",
+            "company": self.company,
+            "meta_groups": [("Billed to", [("Tenant", "Tom Renter")])],
+            "line_items": [
+                {"description": "Rent", "period": "November 2026", "amount": "UGX 950,000"},
+            ],
+            "totals": [("Total due", "UGX 950,000", True)],
+        }).read()
+
+    def give_a_logo(self, width=1400, height=900):
+        from io import BytesIO
+
+        from PIL import Image
+
+        canvas = BytesIO()
+        Image.new("RGBA", (width, height), (11, 37, 69, 255)).save(canvas, format="PNG")
+        self.company.logo.save("lockup.png", ContentFile(canvas.getvalue()))
+
+    def test_the_receipt_and_the_invoice_share_one_letterhead(self):
+        for renderer, title in ((render_invoice_pdf, "RENT INVOICE"),
+                                (render_receipt_pdf, "PAYMENT RECEIPT")):
+            with self.subTest(document=title):
+                page = drawn_text(self.sample(renderer))
+                self.assertIn(title, page)
+                self.assertIn("PROFESSIONAL", page)
+                self.assertIn("TRUSTED", page)
+                self.assertIn("RESULT DRIVEN", page)
+                self.assertIn("MB-TEST-0001", page)
+                self.assertIn("Page 1", page)
+
+    def test_the_contact_block_prints_every_line_the_profile_carries(self):
+        page = drawn_text(self.sample(render_invoice_pdf))
+        self.assertIn("Cham Towers, Kampala Road, Kampala", page)
+        self.assertIn("+256700000000 / +256700000001", page)
+        self.assertIn("desk@mantbridges.test", page)
+        self.assertIn("mantbridges.test", page)
+        self.assertNotIn("https://", page)  # the site prints without its scheme
+
+    def test_the_brand_band_is_letterspaced_and_the_spacing_is_switched_back_off(self):
+        page = drawn_text(self.sample(render_invoice_pdf))
+        self.assertIn("1.6 Tc", page)
+        self.assertIn("0 Tc", page)  # otherwise the leak spaces out the foot line too
+        self.assertIn("Computer-generated document", page)
+
+    def test_the_logo_is_scaled_down_before_it_is_embedded(self):
+        self.give_a_logo()
+        pdf = self.sample(render_invoice_pdf)
+        self.assertIn(b"/DCTDecode", pdf)
+        self.assertLess(len(pdf), 300_000)
+        cached = os.path.join(settings.MEDIA_ROOT, "company", "mb_pdf_logo.jpg")
+        self.assertTrue(os.path.exists(cached))
+        self.assertLess(os.path.getsize(cached), 100_000)
+
+    def test_a_bigger_logo_is_rescaled_rather_than_reused(self):
+        self.give_a_logo()
+        self.sample(render_invoice_pdf)
+        cached = os.path.join(settings.MEDIA_ROOT, "company", "mb_pdf_logo.jpg")
+        from PIL import Image
+
+        with Image.open(cached) as asset:
+            self.assertEqual(asset.size[0], 620)
+
+    def test_a_profile_without_a_logo_still_prints_the_company_name(self):
+        page = drawn_text(self.sample(render_invoice_pdf))
+        self.assertIn("Mant Bridges LTD", page)
+        self.assertIn("Bridging Gaps", page)
+

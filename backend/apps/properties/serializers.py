@@ -5,7 +5,12 @@ from rest_framework import serializers
 from apps.accounts.models import Role, User
 from apps.accounts.serializers import UserBriefSerializer
 from apps.core.helpers import absolute_media_url, format_money
-from apps.properties.models import Enquiry, Property, PropertyImage
+from apps.properties.models import (
+    Enquiry,
+    Property,
+    PropertyImage,
+    PropertyRecommendation,
+)
 
 PERIOD_SUFFIX = {
     Property.PricePeriod.MONTHLY: " / month",
@@ -95,7 +100,8 @@ class PropertyDetailSerializer(PropertyListSerializer):
 
 
 class ManagePropertySerializer(serializers.ModelSerializer):
-    """Create/update payload for landlords and administrators."""
+    """The desk's create/update payload. Landlords read their own listings through it but
+    cannot write — the office publishes what it has verified."""
 
     owner = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(role__in=[Role.LANDLORD, Role.ADMIN]),
@@ -147,12 +153,6 @@ class ManagePropertySerializer(serializers.ModelSerializer):
         return value
 
     def validate_owner(self, value):
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
-        if user is not None and user.role == Role.LANDLORD and value.pk != user.pk:
-            raise serializers.ValidationError(
-                "Landlords can only publish listings under their own account."
-            )
         if value.role not in (Role.LANDLORD, Role.ADMIN):
             raise serializers.ValidationError(
                 "A listing must belong to a landlord or an administrator."
@@ -186,6 +186,85 @@ class ManagePropertySerializer(serializers.ModelSerializer):
         if validated_data.get("owner") is None and request is not None:
             validated_data["owner"] = request.user
         return super().create(validated_data)
+
+
+class PropertyRecommendationSerializer(serializers.ModelSerializer):
+    """What an owner tells the office about a property he wants listed.
+
+    Nothing here reaches the catalogue by itself: `status`, the decision fields and the
+    listing the desk eventually creates are all read-only for the owner.
+    """
+
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    listing_kind_display = serializers.CharField(source="get_listing_kind_display", read_only=True)
+    property_type_display = serializers.CharField(
+        source="get_property_type_display", read_only=True
+    )
+    ownership_display = serializers.CharField(source="get_ownership_display", read_only=True)
+    occupancy_display = serializers.CharField(source="get_occupancy_display", read_only=True)
+    paperwork_display = serializers.CharField(source="get_paperwork_display", read_only=True)
+    listing_title = serializers.CharField(source="listing.title", read_only=True, default="")
+    listing_slug = serializers.CharField(source="listing.slug", read_only=True, default="")
+    listing_price_display = serializers.SerializerMethodField()
+    missing = serializers.SerializerMethodField()
+    is_editable = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PropertyRecommendation
+        fields = [
+            "id", "recommender", "title", "description", "listing_kind",
+            "listing_kind_display", "property_type", "property_type_display",
+            "bedrooms", "bathrooms", "parking_spaces", "area", "area_unit",
+            "price_expectation", "price_period", "currency", "address", "city",
+            "district", "plot_reference", "ownership", "ownership_display",
+            "occupancy", "occupancy_display", "paperwork", "paperwork_display",
+            "paperwork_note", "inspection_contact", "status", "status_display",
+            "submitted_at", "admin_note", "is_editable", "missing",
+            "listing", "listing_title", "listing_slug", "listing_price_display",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "recommender", "status", "submitted_at", "admin_note", "is_editable",
+            "listing", "created_at", "updated_at",
+        ]
+
+    def get_missing(self, obj):
+        return obj.missing_for_submit()
+
+    def get_listing_price_display(self, obj):
+        if not obj.listing_id:
+            return ""
+        return format_money(obj.listing.price, obj.listing.currency or "UGX")
+
+    def validate_title(self, value):
+        return value.strip()
+
+    def validate_price_expectation(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("An expectation below zero is not an answer.")
+        return value
+
+
+class ManageRecommendationSerializer(PropertyRecommendationSerializer):
+    """The desk's copy of the same form: it sees the owner's contact details, records the
+    decision note, and keeps every answer editable so a listing can be corrected first."""
+
+    recommender_name = serializers.CharField(source="recommender.full_name", read_only=True)
+    recommender_email = serializers.CharField(source="recommender.email", read_only=True)
+    recommender_phone = serializers.CharField(source="recommender.phone", read_only=True)
+    decided_by_name = serializers.CharField(source="decided_by.full_name", read_only=True,
+                                            default="")
+
+    class Meta(PropertyRecommendationSerializer.Meta):
+        fields = PropertyRecommendationSerializer.Meta.fields + [
+            "recommender_name", "recommender_email", "recommender_phone",
+            "decided_at", "decided_by_name",
+        ]
+        # The office owns the note the owner reads back; everything else stays as it is.
+        read_only_fields = [
+            field for field in PropertyRecommendationSerializer.Meta.read_only_fields
+            if field != "admin_note"
+        ] + ["decided_at"]
 
 
 class EnquiryCreateSerializer(serializers.ModelSerializer):

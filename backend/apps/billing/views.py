@@ -1,6 +1,6 @@
 from functools import partial
 
-from django.db.models import F, Q, Sum
+from django.db.models import F, Sum
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import Role, User
-from apps.accounts.permissions import IsAdminOrLandlord, IsAdminRole
+from apps.accounts.permissions import IsAdminOrTenant, IsAdminRole, IsLandlordRole
 from apps.billing.filters import InvoiceFilter, PaymentFilter, ReceiptFilter
 from apps.billing.models import ZERO, Invoice, Payment, Receipt
 from apps.billing.serializers import (
@@ -23,6 +23,7 @@ from apps.billing.serializers import (
 )
 from apps.billing.services import (
     generate_invoices_for_lease,
+    landlord_overview,
     late_fee_for,
     rent_analytics,
     scope_for,
@@ -47,9 +48,10 @@ def _months_param(request, default=6):
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
-    """Rent invoices. Administrators see all, landlords their own, tenants their own."""
+    """Rent invoices. Administrators see all, tenants their own. A landlord's own position is
+    reported by /api/landlord/overview/, which carries totals rather than tenant documents."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrTenant]
     serializer_class = InvoiceSerializer
     filterset_class = InvoiceFilter
     ordering_fields = ["due_date", "period_start", "total", "amount_paid", "created_at",
@@ -63,8 +65,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         ).prefetch_related("payments")
         if user.role == Role.ADMIN:
             return queryset
-        if user.role == Role.LANDLORD:
-            return queryset.filter(landlord=user)
         return queryset.filter(tenant=user)
 
     def get_serializer_class(self):
@@ -73,11 +73,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return InvoiceSerializer
 
     def get_permissions(self):
-        if self.action == "destroy":
-            return [IsAuthenticated(), IsAdminRole()]
-        if self.action in ("create", "update", "partial_update", "remind",
+        if self.action in ("create", "update", "partial_update", "destroy", "remind",
                            "apply_late_fee", "generate"):
-            return [IsAuthenticated(), IsAdminOrLandlord()]
+            return [IsAuthenticated(), IsAdminRole()]
         return super().get_permissions()
 
     @action(detail=True, methods=["get"])
@@ -174,7 +172,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrTenant]
     serializer_class = PaymentSerializer
     filterset_class = PaymentFilter
     ordering_fields = ["paid_on", "amount", "created_at", "status"]
@@ -188,13 +186,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
         )
         if user.role == Role.ADMIN:
             return queryset
-        if user.role == Role.LANDLORD:
-            return queryset.filter(Q(lease__landlord=user) | Q(invoice__landlord=user)).distinct()
         return queryset.filter(tenant=user)
 
     def get_permissions(self):
+        # Tenants may report a payment they have made; only the office confirms, rejects or edits.
         if self.action in ("confirm", "reject", "update", "partial_update", "destroy"):
-            return [IsAuthenticated(), IsAdminOrLandlord()]
+            return [IsAuthenticated(), IsAdminRole()]
         return super().get_permissions()
 
     @action(detail=True, methods=["post"])
@@ -244,7 +241,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 
 class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+    """Receipts are issued to the tenant who paid. A landlord's own documents from the rent desk
+    are the reports an administrator generates for him, not these."""
+
+    permission_classes = [IsAuthenticated, IsAdminOrTenant]
     serializer_class = ReceiptSerializer
     filterset_class = ReceiptFilter
     ordering_fields = ["paid_on", "amount", "created_at"]
@@ -257,10 +257,6 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
         )
         if user.role == Role.ADMIN:
             return queryset
-        if user.role == Role.LANDLORD:
-            return queryset.filter(
-                Q(lease__landlord=user) | Q(payment__invoice__landlord=user)
-            ).distinct()
         return queryset.filter(tenant=user)
 
     @action(detail=True, methods=["get"])
@@ -290,9 +286,10 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class AnalyticsView(APIView):
-    """Dashboard numbers for administrators, landlords and tenants."""
+    """Dashboard numbers for the office and for tenants. Landlords have their own read-only
+    summary at /api/landlord/overview/."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrTenant]
 
     def get(self, request):
         user = request.user
@@ -309,14 +306,6 @@ class AnalyticsView(APIView):
                 "landlords": User.objects.filter(role=Role.LANDLORD).count(),
                 "tenants": User.objects.filter(role=Role.TENANT).count(),
                 "receipts": Receipt.objects.filter(is_void=False).count(),
-            }
-        elif user.role == Role.LANDLORD:
-            properties = Property.objects.filter(owner=user)
-            data["portfolio"] = {
-                "properties": properties.count(),
-                "published": properties.filter(is_published=True).count(),
-                "available": properties.filter(status=Property.Status.AVAILABLE).count(),
-                "occupied": properties.filter(status=Property.Status.OCCUPIED).count(),
             }
         else:
             today = timezone.localdate()
@@ -347,7 +336,7 @@ class AnalyticsView(APIView):
 class StatementView(APIView):
     """Running ledger of charges and payments for the requesting user's scope."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrTenant]
 
     def get(self, request):
         invoices, payments, _ = scope_for(request.user)
@@ -357,7 +346,7 @@ class StatementView(APIView):
         if lease_id:
             invoices = invoices.filter(lease_id=lease_id)
             payments = payments.filter(lease_id=lease_id)
-        if tenant_id and request.user.role in (Role.ADMIN, Role.LANDLORD):
+        if tenant_id and request.user.role == Role.ADMIN:
             invoices = invoices.filter(tenant_id=tenant_id)
             payments = payments.filter(tenant_id=tenant_id)
 
@@ -370,3 +359,13 @@ class StatementView(APIView):
         data = tenant_statement(invoices, payments, currency=currency)
         data["filters"] = {"lease": lease_id, "tenant": tenant_id}
         return Response(data)
+
+
+class LandlordOverviewView(APIView):
+    """The landlord portal's whole API surface: the collection trend on his own properties and
+    their occupancy. Aggregates only — no invoice, payment or receipt names a tenant to him."""
+
+    permission_classes = [IsAuthenticated, IsLandlordRole]
+
+    def get(self, request):
+        return Response(landlord_overview(request.user, months=_months_param(request)))

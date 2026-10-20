@@ -3,9 +3,10 @@ import { ArrowRight, Building2, Compass, FileText, HandCoins, Handshake, ShieldC
 import { propertyCities, propertyStats } from '../../api/properties.js'
 import { useApi } from '../../hooks/useApi.js'
 import { useLookups } from '../../context/LookupContext.jsx'
-import { Breadcrumb, Callout, Stat } from '../../components/ui/Blocks.jsx'
+import { ArcBand, Callout, Stat } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Skeleton } from '../../components/ui/Feedback.jsx'
+import { CORE_CITIES } from '../../utils/locations.js'
 
 // The three values from the brochure, stated so that each one covers every service rather than
 // rent collection alone — the same sentence has to hold for a title file or a tender.
@@ -50,25 +51,31 @@ const VALUES = [
   },
 ]
 
+/** Kampala, Wakiso, Mukono and Masaka always appear; a count is shown only where listings exist. */
+function servedAreas(listed = []) {
+  const counts = new Map(listed.map((row) => [row.city.toLowerCase(), row.count]))
+  const core = CORE_CITIES.map((city) => ({ city, count: counts.get(city.toLowerCase()) ?? 0 }))
+  const extras = listed
+    .filter((row) => !CORE_CITIES.some((city) => city.toLowerCase() === row.city.toLowerCase()))
+    .map((row) => ({ city: row.city, count: row.count }))
+  return [...core, ...extras]
+}
+
 export default function About() {
   const { company } = useLookups()
   const stats = useApi(() => propertyStats(), [])
   const cities = useApi(() => propertyCities(), [])
 
+  const areas = servedAreas(cities.data || [])
+
   return (
     <div>
-      <section className="section-tight" style={{ padding: '40px 0 8px' }}>
-        <div className="container stack">
-          <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'About' }]} />
-          <p className="eyebrow">Managing properties with excellence, creating value that lasts.</p>
-          <h1>About Mant Bridges LTD</h1>
-          <p className="lead" style={{ maxWidth: '78ch' }}>
-            {company?.legal_name || company?.name || 'Mant Bridges LTD'} is located in Kampala and operates in Kampala,
-            Wakiso, Mukono, Masaka and all major cities of Uganda on five fronts: Rent collection &amp; property
-            management, Real estate, Contracting &amp; lobbying, Land &amp; property documentation and Debt recovery.
-          </p>
-        </div>
-      </section>
+      <ArcBand
+        crumbs={[{ label: 'Home', to: '/' }, { label: 'About' }]}
+        eyebrow="Managing properties with excellence, creating value that lasts."
+        title="About Mant Bridges LTD"
+        lead={`${company?.legal_name || company?.name || 'Mant Bridges LTD'} is located in Kampala and operates in Kampala, Wakiso, Mukono, Masaka and all major cities of Uganda on five fronts: Rent collection & property management, Real estate, Land & property documentation, Contracting & lobbying and Debt recovery.`}
+      />
 
       <section className="section-tight">
         <div className="container">
@@ -134,29 +141,39 @@ export default function About() {
                       <Stat label="Available listings" value={stats.data.available} to="/properties" />
                       <Stat label="For rent" value={stats.data.for_rent} to="/properties?listing_type=RENT" />
                       <Stat label="For sale" value={stats.data.for_sale} to="/properties?listing_type=SALE" />
-                      <Stat label="Locations" value={stats.data.cities} />
+                      <Stat label="Areas we serve" value={areas.length} />
                     </>
                   ) : null}
                 </div>
               </div>
 
-              {cities.data?.length ? (
-                <div className="card" id="locations" style={{ scrollMarginTop: 90 }}>
-                  <div className="card-head">
-                    <h3>Where we list</h3>
-                  </div>
-                  <div className="card-body chips">
-                    {cities.data.map((row) => (
-                      <Link key={row.city} to={`/properties?city=${encodeURIComponent(row.city)}`} className="chip chip-button">
-                        <Building2 size={14} /> {row.city}
-                        <span className="badge badge-outline" style={{ marginLeft: 4 }}>
-                          {row.count}
-                        </span>
+              <div className="card" id="locations" style={{ scrollMarginTop: 90 }}>
+                <div className="card-head">
+                  <h3>Areas we serve</h3>
+                </div>
+                <div className="card-body stack-sm">
+                  <div className="chips">
+                    {areas.map((area) => (
+                      <Link
+                        key={area.city}
+                        to={`/properties?city=${encodeURIComponent(area.city)}`}
+                        className="chip chip-button"
+                      >
+                        <Building2 size={14} /> {area.city}
+                        {area.count ? (
+                          <span className="badge badge-outline" style={{ marginLeft: 4 }}>
+                            {area.count}
+                          </span>
+                        ) : null}
                       </Link>
                     ))}
                   </div>
+                  <p className="hint" style={{ margin: 0 }}>
+                    Kampala, Wakiso, Mukono, Masaka and all major cities of Uganda. The figure on an area is the listings
+                    on our books there today.
+                  </p>
                 </div>
-              ) : null}
+              </div>
             </aside>
           </div>
         </div>

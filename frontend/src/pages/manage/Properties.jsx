@@ -73,12 +73,18 @@ export default function Properties() {
         lead={
           isAdmin
             ? 'All property on the Mant Bridges books, including drafts and off-market rows. Public visitors only ever see published, available listings.'
-            : 'Property registered to your account. Anything you publish appears on the public catalogue after the listing is marked available.'
+            : 'Property registered to your account. You do not add listings here — the office writes up each one after its own verification. To put a new property forward, use the recommendation form.'
         }
         actions={
-          <Button onClick={() => navigate('/manage/properties/new')}>
-            <Plus size={15} /> New listing
-          </Button>
+          isAdmin ? (
+            <Button onClick={() => navigate('/manage/properties/new')}>
+              <Plus size={15} /> New listing
+            </Button>
+          ) : (
+            <Button to="/landlord/recommendations">
+              <Plus size={15} /> Recommend a property
+            </Button>
+          )
         }
       />
 
@@ -178,7 +184,9 @@ export default function Properties() {
               <p className="muted">
                 {active
                   ? 'Try a different status or clear the filters.'
-                  : 'Create the first listing and it will appear here and on the public catalogue.'}
+                  : isAdmin
+                    ? 'Create the first listing and it will appear here and on the public catalogue.'
+                    : 'Nothing is registered to your account yet. Send the property details to the desk and the office lists it after its own checks.'}
               </p>
             </div>
           }
@@ -195,9 +203,13 @@ export default function Properties() {
                     }}
                   />
                   <span>
-                    <Link to={`/manage/properties/${property.id}/edit`} className="bold">
-                      {property.title}
-                    </Link>
+                    {isAdmin ? (
+                      <Link to={`/manage/properties/${property.id}/edit`} className="bold">
+                        {property.title}
+                      </Link>
+                    ) : (
+                      <span className="bold">{property.title}</span>
+                    )}
                     {property.is_published ? (
                       <a
                         href={`/properties/${property.slug}`}
@@ -233,14 +245,20 @@ export default function Properties() {
                 <StatusBadge value={property.status} label={property.status_display} />
               </Td>
               <Td>
-                <button
-                  type="button"
-                  className={`chip${property.is_published ? ' chip-active' : ''}`}
-                  onClick={() => toggle.execute(property, 'is_published')}
-                  disabled={toggle.pending}
-                >
-                  {property.is_published ? 'Published' : 'Hidden'}
-                </button>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    className={`chip${property.is_published ? ' chip-active' : ''}`}
+                    onClick={() => toggle.execute(property, 'is_published')}
+                    disabled={toggle.pending}
+                  >
+                    {property.is_published ? 'Published' : 'Hidden'}
+                  </button>
+                ) : (
+                  <span className={`chip${property.is_published ? ' chip-active' : ''}`}>
+                    {property.is_published ? 'Published' : 'Not published'}
+                  </span>
+                )}
               </Td>
               <Td num>{(property.views ?? 0).toLocaleString()}</Td>
               <Td>
@@ -252,31 +270,35 @@ export default function Properties() {
                   >
                     <ExternalLink size={14} />
                   </Link>
-                  <Link
-                    to={`/manage/properties/${property.id}/edit`}
-                    className="btn btn-outline btn-sm btn-icon"
-                    title="Edit listing"
-                  >
-                    <Pencil size={14} />
-                  </Link>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm btn-icon"
-                    title="Feature on the homepage"
-                    onClick={() => toggle.execute(property, 'is_featured')}
-                    disabled={toggle.pending}
-                    style={property.is_featured ? { color: 'var(--red-600)', borderColor: 'var(--red-100)' } : undefined}
-                  >
-                    <Star size={14} fill={property.is_featured ? 'currentColor' : 'none'} />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm btn-icon"
-                    title="Delete listing"
-                    onClick={() => setPendingDelete(property)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {isAdmin ? (
+                    <>
+                      <Link
+                        to={`/manage/properties/${property.id}/edit`}
+                        className="btn btn-outline btn-sm btn-icon"
+                        title="Edit listing"
+                      >
+                        <Pencil size={14} />
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm btn-icon"
+                        title="Feature on the homepage"
+                        onClick={() => toggle.execute(property, 'is_featured')}
+                        disabled={toggle.pending}
+                        style={property.is_featured ? { color: 'var(--red-600)', borderColor: 'var(--red-100)' } : undefined}
+                      >
+                        <Star size={14} fill={property.is_featured ? 'currentColor' : 'none'} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm btn-icon"
+                        title="Delete listing"
+                        onClick={() => setPendingDelete(property)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </Td>
             </tr>
@@ -293,9 +315,10 @@ export default function Properties() {
 
         {!isAdmin ? (
           <Callout tone="navy">
-            Listings you create are always owned by your own account (
-            {company?.name ?? 'Mant Bridges LTD'} reviews each one before it reaches the public catalogue). Only
-            administrators can publish under another landlord.
+            These listings were written up by {company?.name ?? 'Mant Bridges'} from your
+            recommendations, after the desk did its own checks. If anything here is wrong or you
+            want a property added, send it through the recommendation form — only administrators
+            edit the listing itself.
           </Callout>
         ) : null}
       </Panel>

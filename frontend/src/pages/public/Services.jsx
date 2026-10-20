@@ -11,7 +11,7 @@ import { listServices } from '../../api/services.js'
 import { collect } from '../../api/paginate.js'
 import { useApi } from '../../hooks/useApi.js'
 import ServiceBadge from '../../components/services/ServiceBadge.jsx'
-import { Callout } from '../../components/ui/Blocks.jsx'
+import { ArcBand } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { EmptyState, ErrorState, Loading } from '../../components/ui/Feedback.jsx'
 import { mediaUrl } from '../../utils/media.js'
@@ -44,22 +44,11 @@ export default function Services() {
 
   return (
     <div>
-      <section
-        className="section-tight arc-band"
-        style={{ background: 'var(--navy-800)', color: '#fff', padding: '44px 0 74px' }}
-      >
-        <div className="container stack">
-          <p className="eyebrow" style={{ color: '#ffb3bd' }}>
-            Comprehensive. Professional. Results Driven.
-          </p>
-          <h1 style={{ color: '#fff', maxWidth: '24ch' }}> Our services </h1>
-          <p style={{ color: 'var(--navy-100)', maxWidth: '70ch', margin: 0 }}>
-            Rent collection &amp; property management, Real estate, Contracting &amp; lobbying,
-            Land &amp; property documentation, and lastly Debt recovery.
-          </p>
-        </div>
-        <span className="arc-swoosh" aria-hidden="true" />
-      </section>
+      <ArcBand
+        eyebrow="Comprehensive. Professional. Results Driven."
+        title="Our services"
+        lead="Rent collection & property management, Real estate, Land & property documentation, Contracting & lobbying, and lastly Debt recovery."
+      />
 
       <div className="container stack stack-lg">
         {services.loading ? (
@@ -111,7 +100,6 @@ export default function Services() {
                     ))}
                   </ul>
                 ) : null}
-                {service.limitations ? <Callout>{service.limitations}</Callout> : null}
                 <div className="row">
                   <Button to={`/services/${service.slug}`} variant="accent" size="sm">
                     Full service detail <ArrowRight size={15} />

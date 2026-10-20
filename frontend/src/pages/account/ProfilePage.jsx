@@ -9,6 +9,7 @@ import { Avatar, Panel } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Field, FormAlert, Input } from '../../components/ui/Form.jsx'
 import { RoleBadge } from '../../components/ui/Badge.jsx'
+import { areaFor } from '../../utils/nav.js'
 
 const FIELDS = [
   'first_name',
@@ -154,7 +155,7 @@ export default function ProfilePage({ breadcrumb }) {
               <p className="hint" style={{ margin: 0 }}>
                 Signed in as {user?.email}. Password changes live on the Change password page.
               </p>
-              <Button to={user?.role === 'TENANT' ? '/portal/password' : '/manage/password'} variant="outline" size="sm">
+              <Button to={`${areaFor(user)}/password`} variant="outline" size="sm">
                 Change password
               </Button>
             </div>

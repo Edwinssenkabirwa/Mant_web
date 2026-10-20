@@ -1,5 +1,5 @@
 from django.db.models import Count, F
-from rest_framework import status, viewsets
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import CreateAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -7,17 +7,29 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.models import Role
-from apps.accounts.permissions import IsAdminOrLandlord, IsAdminRole
+from apps.accounts.permissions import (
+    IsAdminOrLandlord,
+    IsAdminRole,
+    IsLandlordRole,
+)
 from apps.properties.filters import PropertyFilter
-from apps.properties.models import Enquiry, Property, PropertyImage
-from apps.properties.permissions import IsImageOwnerOrAdmin, IsPropertyOwnerOrAdmin
+from apps.properties.models import Enquiry, Property, PropertyImage, PropertyRecommendation
 from apps.properties.serializers import (
     EnquiryCreateSerializer,
     EnquirySerializer,
     ManagePropertySerializer,
+    ManageRecommendationSerializer,
     PropertyDetailSerializer,
     PropertyImageSerializer,
     PropertyListSerializer,
+    PropertyRecommendationSerializer,
+)
+from apps.properties.services import (
+    RecommendationError,
+    decline_recommendation,
+    mark_in_review,
+    submit_recommendation,
+    verify_recommendation,
 )
 
 
@@ -92,7 +104,9 @@ class PublicPropertyViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ManagePropertyViewSet(viewsets.ModelViewSet):
-    """Landlords manage their own listings; administrators manage everything."""
+    """Administrator-managed listings. An owner may read the listings registered to his
+    account, but only the office writes them — a property reaches the catalogue through the
+    recommendation queue, where it is checked and verified first."""
 
     permission_classes = [IsAuthenticated, IsAdminOrLandlord]
     serializer_class = ManagePropertySerializer
@@ -109,8 +123,8 @@ class ManagePropertyViewSet(viewsets.ModelViewSet):
         return queryset
 
     def get_permissions(self):
-        if self.action in ("update", "partial_update", "destroy", "images"):
-            return [IsAuthenticated(), IsAdminOrLandlord(), IsPropertyOwnerOrAdmin()]
+        if self.action in ("create", "update", "partial_update", "destroy", "images"):
+            return [IsAuthenticated(), IsAdminRole()]
         return super().get_permissions()
 
     @action(detail=True, methods=["post"], url_path="images",
@@ -161,7 +175,11 @@ class ManagePropertyViewSet(viewsets.ModelViewSet):
 
 
 class PropertyImageViewSet(viewsets.ModelViewSet):
-    """Re-order, promote or delete images that already belong to a listing."""
+    """Re-order, promote or delete images that already belong to a listing — office only.
+
+    An owner sees the pictures on his own listings, but he does not edit them: what is
+    published is what the desk verified.
+    """
 
     permission_classes = [IsAuthenticated, IsAdminOrLandlord]
     serializer_class = PropertyImageSerializer
@@ -177,8 +195,8 @@ class PropertyImageViewSet(viewsets.ModelViewSet):
         return queryset
 
     def get_permissions(self):
-        if self.action in ("retrieve", "update", "partial_update", "destroy"):
-            return [IsAuthenticated(), IsAdminOrLandlord(), IsImageOwnerOrAdmin()]
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAuthenticated(), IsAdminRole()]
         return super().get_permissions()
 
 
@@ -208,4 +226,171 @@ class ManageEnquiryViewSet(viewsets.ModelViewSet):
         counts = {row["status"]: row["count"] for row in rows}
         counts["total"] = Enquiry.objects.count()
         counts["new"] = Enquiry.objects.filter(status=Enquiry.Status.NEW).count()
+        return Response(counts)
+
+
+class LandlordRecommendationViewSet(viewsets.ModelViewSet):
+    """An owner's own recommendations.
+
+    He may add as many as he likes and keep correcting them while the desk works, but the
+    queue only sees a recommendation once he sends it, and the decision is never his to make.
+    """
+
+    permission_classes = [IsAuthenticated, IsLandlordRole]
+    serializer_class = PropertyRecommendationSerializer
+    filterset_fields = ["status", "listing_kind"]
+    ordering = ["-created_at"]
+    ordering_fields = ["created_at", "status", "price_expectation"]
+    http_method_names = ["get", "post", "patch", "put", "delete", "head", "options"]
+
+    def get_queryset(self):
+        return (
+            PropertyRecommendation.objects.select_related("recommender", "listing")
+            .filter(recommender=self.request.user)
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(recommender=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        blocked = self._refuse_if_decided()
+        if blocked:
+            return blocked
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        blocked = self._refuse_if_decided()
+        if blocked:
+            return blocked
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        recommendation = self.get_object()
+        if recommendation.status != PropertyRecommendation.Status.DRAFT:
+            return Response(
+                {"detail": "This one is already with the desk, so it stays on the record. "
+                            "Message the office if something has changed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+    def _refuse_if_decided(self):
+        recommendation = self.get_object()
+        if not recommendation.is_editable:
+            return Response(
+                {"detail": "The desk has already decided on this property, so it can no "
+                            "longer be edited here."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return None
+
+    @action(detail=True, methods=["post"])
+    def submit(self, request, *args, **kwargs):
+        """Send the recommendation to the office for due diligence."""
+        recommendation = self.get_object()
+        try:
+            submit_recommendation(recommendation)
+        except RecommendationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.get_serializer(recommendation).data)
+
+
+class VerifyRecommendationSerializer(serializers.Serializer):
+    """The desk's own answers for the fields a listing cannot go out without."""
+
+    listing_type = serializers.ChoiceField(choices=Property.ListingType.choices, required=False)
+    price = serializers.DecimalField(max_digits=14, decimal_places=2, required=False)
+    currency = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    note = serializers.CharField(required=False, allow_blank=True)
+
+
+class DeclineRecommendationSerializer(serializers.Serializer):
+    note = serializers.CharField()
+
+    def validate_note(self, value):
+        if len(value.strip()) < 5:
+            raise serializers.ValidationError(
+                "Say briefly why — the owner reads this and can act on it."
+            )
+        return value.strip()
+
+
+class ManageRecommendationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                                  mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                                  viewsets.GenericViewSet):
+    """The verification queue: everything owners have sent, for the office to check.
+
+    The desk edits what an owner wrote and decides on it, but does not author recommendations
+    on his behalf — that would put words in the owner's mouth.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminRole]
+    serializer_class = ManageRecommendationSerializer
+    filterset_fields = ["status", "listing_kind", "city", "property_type", "recommender"]
+    search_fields = ["title", "description", "address", "city", "district", "plot_reference",
+                     "recommender__full_name", "recommender__email"]
+    ordering = ["-created_at"]
+    ordering_fields = ["created_at", "status", "price_expectation"]
+
+    def get_queryset(self):
+        queryset = PropertyRecommendation.objects.select_related(
+            "recommender", "listing", "decided_by"
+        )
+        # An empty draft is the owner's private working copy, so it is left out of the default
+        # list. Ask for ?status=DRAFT, or open a row directly, and the desk can still reach it.
+        if self.action == "list" and "status" not in self.request.query_params:
+            queryset = queryset.exclude(status=PropertyRecommendation.Status.DRAFT)
+        return queryset
+
+    @action(detail=True, methods=["post"])
+    def review(self, request, *args, **kwargs):
+        """Mark that due diligence has started."""
+        recommendation = self.get_object()
+        try:
+            mark_in_review(recommendation)
+        except RecommendationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.get_serializer(recommendation).data)
+
+    @action(detail=True, methods=["post"])
+    def verify(self, request, *args, **kwargs):
+        """Check it, then publish the listing on the owner's account."""
+        recommendation = self.get_object()
+        form = VerifyRecommendationSerializer(data=request.data)
+        form.is_valid(raise_exception=True)
+        answers = form.validated_data
+        try:
+            verify_recommendation(
+                recommendation,
+                by_user=request.user,
+                listing_type=answers.get("listing_type"),
+                price=answers.get("price"),
+                currency=answers.get("currency") or None,
+                note=answers.get("note", ""),
+            )
+        except RecommendationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        recommendation.refresh_from_db()
+        return Response(self.get_serializer(recommendation).data)
+
+    @action(detail=True, methods=["post"])
+    def decline(self, request, *args, **kwargs):
+        recommendation = self.get_object()
+        form = DeclineRecommendationSerializer(data=request.data)
+        form.is_valid(raise_exception=True)
+        try:
+            decline_recommendation(
+                recommendation, by_user=request.user, note=form.validated_data["note"]
+            )
+        except RecommendationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.get_serializer(recommendation).data)
+
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        rows = PropertyRecommendation.objects.values("status").annotate(count=Count("id"))
+        counts = {row["status"]: row["count"] for row in rows}
+        counts["total"] = sum(counts.values())
+        counts["waiting"] = counts.get("DRAFT", 0) + counts.get("SUBMITTED", 0) + \
+            counts.get("IN_REVIEW", 0)
         return Response(counts)

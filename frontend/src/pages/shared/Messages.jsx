@@ -16,7 +16,11 @@ export default function Messages() {
       <PageHeader
         eyebrow="Messages"
         title="Inbox"
-        lead="Threads between tenants, landlords and the Mant Bridges desk. Attachments are stored with the message; there are no email or SMS notifications yet, so read the inbox to stay up to date."
+        lead={
+          user?.role === 'LANDLORD'
+            ? 'Your correspondence with the Mant Bridges desk. A thread that also holds a tenant belongs to that tenant and is not shown to you. Attachments are stored with the message; there are no email or SMS notifications yet, so read the inbox to stay up to date.'
+            : 'Threads between tenants, landlords and the Mant Bridges desk. Attachments are stored with the message; there are no email or SMS notifications yet, so read the inbox to stay up to date.'
+        }
       />
       <MessagingWorkspace
         allowScopeAll={user?.role === 'ADMIN'}

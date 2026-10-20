@@ -35,7 +35,15 @@ class ConversationViewSet(mixins.CreateModelMixin, mixins.DestroyModelMixin,
         ).prefetch_related("participants", "messages__sender", "messages__read_by")
         if user.role == Role.ADMIN and self.request.query_params.get("scope") == "all":
             return queryset
-        return queryset.filter(participants=user)
+        queryset = queryset.filter(participants=user)
+        if user.role == Role.LANDLORD:
+            # A landlord's inbox is his correspondence with the office. A thread that also holds a
+            # tenant belongs to that tenant and to us, not to him.
+            with_tenants = queryset.filter(
+                participants__role=Role.TENANT
+            ).values_list("pk", flat=True)
+            queryset = queryset.exclude(pk__in=list(with_tenants))
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "create":

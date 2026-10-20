@@ -21,3 +21,12 @@ export default function ServiceBadge({ icon, size = 24 }) {
     </span>
   )
 }
+
+/**
+ * The picker used by the services editor, derived from the map above so it can never offer a key
+ * that renders nothing — the one icon rule the backend cannot check for itself.
+ */
+export const ICON_OPTIONS = [
+  { value: '', label: 'No badge' },
+  ...Object.keys(ICONS).map((key) => ({ value: key, label: key[0].toUpperCase() + key.slice(1) })),
+]

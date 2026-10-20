@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronDown, KeyRound, LogOut, MessageSquare, UserCircle, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { Avatar } from '../ui/Blocks.jsx'
+import { areaFor } from '../../utils/nav.js'
 import { humanStatus } from '../../utils/status.js'
 
 export function UserMenu({ variant = 'dark', onAfterAction, unread = 0 }) {
@@ -60,7 +61,7 @@ export function UserMenu({ variant = 'dark', onAfterAction, unread = 0 }) {
           </Link>
           <Link
             className="dropdown-item"
-            to={user.role === 'TENANT' ? '/portal/messages' : '/manage/messages'}
+            to={`${areaFor(user)}/messages`}
             role="menuitem"
             onClick={close}
           >
@@ -69,7 +70,7 @@ export function UserMenu({ variant = 'dark', onAfterAction, unread = 0 }) {
           </Link>
           <Link
             className="dropdown-item"
-            to={user.role === 'TENANT' ? '/portal/profile' : '/manage/profile'}
+            to={`${areaFor(user)}/profile`}
             role="menuitem"
             onClick={close}
           >
@@ -77,7 +78,7 @@ export function UserMenu({ variant = 'dark', onAfterAction, unread = 0 }) {
           </Link>
           <Link
             className="dropdown-item"
-            to={user.role === 'TENANT' ? '/portal/password' : '/manage/password'}
+            to={`${areaFor(user)}/password`}
             role="menuitem"
             onClick={close}
           >

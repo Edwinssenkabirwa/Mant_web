@@ -86,3 +86,57 @@ export const MANAGE_PROPERTY_ORDERING = [
   { value: 'status', label: 'Status' },
   { value: 'city', label: 'City' },
 ]
+
+/* ---------- An owner's own recommendations (/api/landlord/recommendations/) -- */
+
+export function listMyRecommendations(params) {
+  return get('/landlord/recommendations/', params)
+}
+
+export function myRecommendation(id) {
+  return get(`/landlord/recommendations/${id}/`)
+}
+
+export function createRecommendation(payload) {
+  return post('/landlord/recommendations/', payload)
+}
+
+/** PUT needs every field again, so amending one answer is a PATCH. */
+export function updateRecommendation(id, payload) {
+  return patch(`/landlord/recommendations/${id}/`, payload)
+}
+
+export function deleteRecommendation(id) {
+  return del(`/landlord/recommendations/${id}/`)
+}
+
+export function sendRecommendation(id) {
+  return post(`/landlord/recommendations/${id}/submit/`, {})
+}
+
+/* ---------- The office verification queue (/api/manage/recommendations/) ---- */
+
+export function recommendationQueue(params) {
+  return get('/manage/recommendations/', params)
+}
+
+export function recommendationQueueStats() {
+  return get('/manage/recommendations/stats/')
+}
+
+export function editRecommendation(id, payload) {
+  return patch(`/manage/recommendations/${id}/`, payload)
+}
+
+export function startDueDiligence(id) {
+  return post(`/manage/recommendations/${id}/review/`, {})
+}
+
+/** Publishes the listing on the owner's account. `{ listing_type, price, currency, note }`. */
+export function verifyRecommendation(id, payload) {
+  return post(`/manage/recommendations/${id}/verify/`, payload)
+}
+
+export function declineRecommendation(id, payload) {
+  return post(`/manage/recommendations/${id}/decline/`, payload)
+}

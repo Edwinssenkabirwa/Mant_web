@@ -24,6 +24,7 @@ import Dashboard from './pages/manage/Dashboard.jsx'
 import Reports from './pages/manage/Reports.jsx'
 import ManageProperties from './pages/manage/Properties.jsx'
 import PropertyForm from './pages/manage/PropertyForm.jsx'
+import RecommendationQueue from './pages/manage/Recommendations.jsx'
 import Users from './pages/manage/Users.jsx'
 import Leases from './pages/manage/Leases.jsx'
 import LeaseForm from './pages/manage/LeaseForm.jsx'
@@ -44,7 +45,11 @@ import TenantDashboard from './pages/portal/Dashboard.jsx'
 import TenantLeases from './pages/portal/Leases.jsx'
 import TenantStatement from './pages/portal/Statement.jsx'
 
-const MANAGE_ROLES = ['ADMIN', 'LANDLORD']
+import LandlordOverview from './pages/landlord/Overview.jsx'
+import LandlordRecommendations from './pages/landlord/Recommendations.jsx'
+import RecommendationForm from './pages/landlord/RecommendationForm.jsx'
+
+const MANAGE_ROLES = ['ADMIN']
 
 export default function App() {
   return (
@@ -73,7 +78,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Route>
 
-        {/* Staff area: ADMIN and LANDLORD. Django decides what each row is. */}
+        {/* Office area: ADMIN only. Landlords have their own portal below. */}
         <Route element={<ProtectedRoute roles={MANAGE_ROLES} />}>
           <Route element={<DashboardLayout />}>
             <Route path="manage" element={<Dashboard />} />
@@ -95,6 +100,7 @@ export default function App() {
             <Route element={<ProtectedRoute roles={['ADMIN']} />}>
               <Route path="manage/users" element={<Users />} />
               <Route path="manage/enquiries" element={<Enquiries />} />
+              <Route path="manage/recommendations" element={<RecommendationQueue />} />
               <Route path="manage/posts" element={<ManagePosts />} />
               <Route path="manage/posts/new" element={<PostForm />} />
               <Route path="manage/posts/:id/edit" element={<PostForm />} />
@@ -119,6 +125,20 @@ export default function App() {
             <Route path="portal/messages" element={<Messages />} />
             <Route path="portal/profile" element={<ProfilePage />} />
             <Route path="portal/password" element={<PasswordPage />} />
+          </Route>
+        </Route>
+
+        {/* Landlord portal: read-only view of his own book plus the office threads. */}
+        <Route element={<ProtectedRoute roles={['LANDLORD']} />}>
+          <Route element={<DashboardLayout />}>
+            <Route path="landlord" element={<LandlordOverview />} />
+            <Route path="landlord/properties" element={<ManageProperties />} />
+            <Route path="landlord/recommendations" element={<LandlordRecommendations />} />
+            <Route path="landlord/recommendations/new" element={<RecommendationForm />} />
+            <Route path="landlord/recommendations/:id/edit" element={<RecommendationForm />} />
+            <Route path="landlord/messages" element={<Messages />} />
+            <Route path="landlord/profile" element={<ProfilePage />} />
+            <Route path="landlord/password" element={<PasswordPage />} />
           </Route>
         </Route>
       </Routes>

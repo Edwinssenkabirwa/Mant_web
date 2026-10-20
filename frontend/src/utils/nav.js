@@ -9,10 +9,12 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
+  PlusCircle,
   Receipt,
   Scale,
   Send,
   Settings,
+  ShieldCheck,
   Tag,
   UserCircle,
   Users,
@@ -21,10 +23,19 @@ import {
 
 export const MANAGE_HOME = '/manage';
 export const TENANT_HOME = '/portal';
+export const LANDLORD_HOME = '/landlord';
+
+/** The route prefix a signed-in person's own screens live under. */
+export function areaFor(user) {
+  if (user?.role === 'TENANT') return TENANT_HOME;
+  if (user?.role === 'LANDLORD') return LANDLORD_HOME;
+  return MANAGE_HOME;
+}
 
 export function homePathFor(user) {
   if (!user) return '/';
-  if (user.role === 'ADMIN' || user.role === 'LANDLORD') return MANAGE_HOME;
+  if (user.role === 'ADMIN') return MANAGE_HOME;
+  if (user.role === 'LANDLORD') return LANDLORD_HOME;
   if (user.role === 'TENANT') return TENANT_HOME;
   return '/';
 }
@@ -40,6 +51,7 @@ const MANAGE_ADMIN = [
   { to: '/manage/leases', label: 'Leases', icon: KeyRound },
   { section: 'Portfolio' },
   { to: '/manage/properties', label: 'Properties', icon: Building2 },
+  { to: '/manage/recommendations', label: 'Recommendations', icon: ShieldCheck },
   { to: '/manage/users', label: 'People', icon: Users },
   { section: 'Desk' },
   { to: '/manage/enquiries', label: 'Enquiries', icon: Inbox, countKey: 'new_enquiries' },
@@ -55,20 +67,20 @@ const MANAGE_ADMIN = [
   { to: '/manage/profile', label: 'My account', icon: UserCircle },
 ];
 
-const MANAGE_LANDLORD = [
-  { section: 'Overview' },
-  { to: '/manage', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/manage/reports', label: 'Reports', icon: BarChart3 },
-  { section: 'Rent book' },
-  { to: '/manage/invoices', label: 'Invoices', icon: FileText, countKey: 'overdue_invoices' },
-  { to: '/manage/payments', label: 'Payments', icon: Wallet, countKey: 'pending_payments' },
-  { to: '/manage/receipts', label: 'Receipts', icon: Receipt },
-  { to: '/manage/leases', label: 'Leases', icon: KeyRound },
-  { section: 'Portfolio' },
-  { to: '/manage/properties', label: 'My properties', icon: Building2 },
+/**
+ * The owner's portal. Read-only by design: his collection trend, the occupancy of his own
+ * properties and his thread with the office. The rent book itself — invoices, payments,
+ * receipts, leases — stays with the Mant Bridges desk, and new properties reach the desk as
+ * recommendations the office verifies before anything is published.
+ */
+const LANDLORD_PORTAL = [
+  { section: 'My book' },
+  { to: LANDLORD_HOME, label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: `${LANDLORD_HOME}/properties`, label: 'My properties', icon: Building2 },
+  { to: `${LANDLORD_HOME}/recommendations`, label: 'Recommend a property', icon: PlusCircle },
   { section: 'Desk' },
-  { to: '/manage/messages', label: 'Messages', icon: MessageSquare, countKey: 'unread' },
-  { to: '/manage/profile', label: 'My account', icon: UserCircle },
+  { to: `${LANDLORD_HOME}/messages`, label: 'Messages', icon: MessageSquare, countKey: 'unread' },
+  { to: `${LANDLORD_HOME}/profile`, label: 'My account', icon: UserCircle },
 ];
 
 const TENANT_PORTAL = [
@@ -88,13 +100,9 @@ const TENANT_PORTAL = [
 export function navFor(user) {
   if (!user) return [];
   if (user.role === 'ADMIN') return MANAGE_ADMIN;
-  if (user.role === 'LANDLORD') return MANAGE_LANDLORD;
+  if (user.role === 'LANDLORD') return LANDLORD_PORTAL;
   if (user.role === 'TENANT') return TENANT_PORTAL;
   return [];
-}
-
-export function shellFor(user) {
-  return user?.role === 'TENANT' ? 'portal' : 'manage';
 }
 
 export const PUBLIC_NAV = [

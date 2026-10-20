@@ -85,7 +85,7 @@ class LookupsAPIView(APIView):
         from apps.billing.models import Invoice, Payment
         from apps.blog.models import Category
         from apps.leases.models import Lease
-        from apps.properties.models import AMENITIES, Property
+        from apps.properties.models import AMENITIES, Property, PropertyRecommendation
 
         def choices(model, field):
             return [
@@ -106,8 +106,14 @@ class LookupsAPIView(APIView):
             "property_types": choices(Property, "property_type"),
             "listing_types": choices(Property, "listing_type"),
             "property_statuses": choices(Property, "status"),
+            "price_periods": choices(Property, "price_period"),
             "amenities": AMENITIES,
             "cities": sorted(cities),
+            "recommendation_statuses": choices(PropertyRecommendation, "status"),
+            "listing_kinds": choices(PropertyRecommendation, "listing_kind"),
+            "ownership_kinds": choices(PropertyRecommendation, "ownership"),
+            "occupancy_states": choices(PropertyRecommendation, "occupancy"),
+            "paperwork_states": choices(PropertyRecommendation, "paperwork"),
             "payment_methods": choices(Payment, "method"),
             "payment_statuses": choices(Payment, "status"),
             "invoice_statuses": choices(Invoice, "status"),

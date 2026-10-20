@@ -17,7 +17,8 @@ frontend/         React 18 + Vite 5 + react-router 6, talking to the API over /a
   src/context     AuthContext (JWT + role), LookupContext (server vocabularies), CompanyContext
   src/hooks       useApi, useList, useAction, useDebounce
   src/components  ui/ design-system primitives, layout/, properties/, billing/, messaging/
-  src/pages       public/, auth/, account/, manage/ (admin+landlord), portal/ (tenant), shared/
+  src/pages       public/, auth/, account/, manage/ (admin), landlord/ (owner portal),
+                  portal/ (tenant), shared/
   src/styles/global.css   the whole design system (navy/red/ink tokens, layout, tables, forms)
 ```
 
@@ -71,6 +72,11 @@ becomes a subheading, consecutive `- ` lines become a bulleted list, and a blank
 paragraphs. Nothing else (bold, links, numbered lists) is rendered, and administrators are free to
 write plain prose instead.
 
+No public page prints a disclaimer. `Service.limitations` still stores the hedging for staff, but the
+service cards and service pages stopped rendering the "Honest limits" note, and migration `core.0009`
+removed the two body sections that read the same way — "The line we hold" on debt recovery and
+"Where our role stops" on land documentation.
+
 ### `backend/.env`
 
 | Variable | Purpose |
@@ -118,8 +124,8 @@ Media is portable by design: the API returns `request.build_absolute_uri()` path
 | --- | --- | --- |
 | ADMIN | `admin@mantbridges.com` | `/manage` |
 | ADMIN (ops) | `ops@mantbridges.com` | `/manage` |
-| LANDLORD | `landlord@mantbridges.com` | `/manage` (own scope) |
-| LANDLORD | `aisha@mantbridges.com` | `/manage` (own scope) |
+| LANDLORD | `landlord@mantbridges.com` | `/landlord` (own book, read-only) |
+| LANDLORD | `aisha@mantbridges.com` | `/landlord` (own book, read-only) |
 | TENANT | `tenant@mantbridges.com` | `/portal` |
 
 ## Scheduled jobs
@@ -182,10 +188,55 @@ Complete and wired to real data:
 `/manage/invoices` (+`:id`) · `/manage/payments` · `/manage/receipts` · `/manage/messages` ·
 `/manage/profile` · `/manage/password` · `/manage/users` · `/manage/enquiries` ·
 `/manage/posts` (+`new`, `:id/edit`) · `/manage/categories` · `/manage/email/campaigns` ·
-`/manage/email/subscribers` · `/manage/company` ·
+`/manage/email/subscribers` · `/manage/company` · `/manage/recommendations` ·
+`/landlord` · `/landlord/properties` · `/landlord/recommendations` (+`new`, `:id/edit`) ·
+`/landlord/messages` · `/landlord/profile` ·
+`/landlord/password` ·
 `/portal` · `/portal/leases` · `/portal/statement` · `/portal/invoices` (+`:id`) ·
 `/portal/payments` · `/portal/receipts` · `/portal/messages` · `/portal/profile` ·
 `/portal/password`
+
+The whole `/manage` area is ADMIN-only since the landlord portal was cut over. A landlord who
+opens `/manage/invoices` gets the "This area is not open to your account" panel, and the same
+request is refused by Django with 403 whether or not the browser was told.
+`/landlord` reads `/api/landlord/overview/`, which returns aggregates of that owner's own book —
+collection trend, occupancy and a per-property collected/outstanding split — and never an
+invoice, payment, receipt, lease or tenant detail. His properties page is read-only: no create,
+edit, publish, feature or delete affordance is rendered, and the same writes are refused by the
+API. A landlord has no listing form at all; new properties reach the catalogue only as
+recommendations (below).
+
+## Property recommendations and verification
+
+An owner recommends; only the office publishes. The whole path is `apps/properties/`:
+
+- `PropertyRecommendation` (migration `properties.0003`) holds the owner's answers — what the
+  property is, whether it is to rent, for sale or both, the size, his own price expectation, where
+  it sits, how it relates to him, who to call to view it — and its status: `DRAFT`, `SUBMITTED`,
+  `IN_REVIEW`, `VERIFIED`, `DECLINED`.
+- `/landlord/recommendations` (`pages/landlord/Recommendations.jsx` + `RecommendationForm.jsx`) lets
+  him keep as many forms as he wants. A DRAFT is his private working copy: the desk's queue excludes
+  drafts unless someone deliberately asks for `?status=DRAFT`. "Send to the desk" saves the screen
+  first and then posts `…/submit/`, and `submit_recommendation()` refuses anything still missing a
+  title, description, offer type, kind, address, town or ownership — the missing items are named in
+  the 400 and listed under each row.
+- `/manage/recommendations` (`pages/manage/Recommendations.jsx`) is the desk's queue: tabs with live
+  counts from `stats/`, search across the owner's name, title, address and plot reference, a
+  "Due diligence" step (`SUBMITTED → IN_REVIEW`), and a decision modal that shows every answer
+  before it asks for one. **Verify publishes immediately** — `verify_recommendation()` creates the
+  `Property` in one transaction, owned by the recommender, at his own expectation unless the desk
+  types another price, with `is_published=True`. The listing then appears on the public site under
+  its `MB-P#####` reference. Turning one down requires a reason the owner can act on; he reads it in
+  his portal, and his form locks the moment the desk decides.
+- Every write to `/api/manage/properties/` and `/api/manage/properties/*/images/` is `IsAdminRole`.
+  Landlords still read their own listings through the same endpoints.
+- `apps/accounts/signals.py` opens the paperwork a new account needs: a landlord gets an empty DRAFT
+  form waiting in his portal, a tenant gets a NEW enquiry with his name, e-mail and phone so the desk
+  can write the brief and match it to a verified listing.
+
+The copy is deliberately unflattering to nobody: the owner's figure is called his expectation, not a
+valuation, and a published listing is described as verified by the landlord and verified by the
+team, with illustrative artwork labelled as such.
 
 Built but deliberately limited, because the backend does not support more:
 
@@ -193,9 +244,9 @@ Built but deliberately limited, because the backend does not support more:
   application tracking. No fake form. (follow-up 6)
 - Password reset — the login page says it is unavailable and points to the desk. (follow-up 1)
 - Email/identity verification — registration activates immediately and says so. (follow-up 3)
-- Landlord lease form — cannot pick a brand-new tenant; explains why instead of showing an
-  empty picker. (follow-up 4)
 - Landlord cannot open the enquiry inbox; the route is admin-only. (follow-up 5)
+- The landlord portal shows totals, not documents. A payout receipt or a signed report for the
+  owner is not generated yet — the portal says so and routes the request to the desk by message.
 - Payments are never taken online. Recording one creates a PENDING entry awaiting desk
   confirmation; the tenant portal shows the company's bank/mobile-money instructions.
 - Logout clears the browser session but cannot revoke the token server-side. (follow-up 2)
@@ -256,11 +307,39 @@ it with a queue worker). While `EMAIL_BACKEND` is not `smtp.EmailBackend` the ca
 which backend is live and states that nothing can reach an inbox; the automated tests use the
 in-memory backend and assert on `mail.outbox`.
 
+## Documents and the letterhead
+
+`apps/core/services/documents.py` is the only place a PDF is laid out, so a receipt, a rent
+invoice and anything the desk prints later all leave on the same stationery:
+
+- **Across the top** — the logo lockup at 46 mm, and the contact block on the right: address and
+  city, the three phone lines on one row, the e-mail and the site without its `https://`. Every
+  line comes from the company profile in `/django-admin/`; a field left empty simply drops out.
+- **The rule** — navy across the page with a short red segment at its right end.
+- **Behind the page** — the logo mark, wordmark cropped off, at 7% opacity low on the right.
+- **Along the foot** — the navy band reading PROFESSIONAL | TRUSTED | RESULT DRIVEN with the red
+  sweep out of the bottom-right corner, then the office line and the page number above it.
+  The band and the mark are drawn on every page, not just the first.
+
+The uploaded logo runs to over a megabyte, which would make a one-page receipt heavier than the
+record it prints, so it is scaled to 620 px and cached beside the upload as `mb_pdf_logo.jpg` /
+`mb_pdf_mark.jpg` in `MEDIA_ROOT/company/`. Those two files are derived, regenerable and safe to
+delete; they are rewritten whenever the logo changes.
+
+A receipt with a long metadata block, a breakdown, payment details and a signature line runs to
+two pages — the signature block falls alone onto the second. That is the layout, not a bug: the
+letterhead repeats, and the alternative is a document that no longer reads like the paper the
+office signs on.
+
 ## Security notes (read before deploying)
 
 - **JWT lives in `localStorage`** (`mb.access`, `mb.refresh`, `mb.user`). Any XSS can read it, and
   there is no blacklist, so a token outlives "sign out". Migrate to `httpOnly` cookies +
   `token_blacklist` for real production.
+- **Generated PDFs are readable without signing in.** `Receipt.pdf` is written into `MEDIA_ROOT`,
+  and while `DEBUG=True` Django serves `/media/` directly, so a receipt URL answers 200 to an
+  anonymous request even though `/api/receipts/{id}/download/` checks the role. Move documents
+  outside the media tree — `BACKEND_FOLLOWUPS.md` 19.
 - **React route guards are UX only.** `ProtectedRoute` / role checks hide links and redirect; every
   endpoint re-checks permissions in Django. Nothing in the UI is a security boundary.
 - **No throttling on `POST /api/auth/login/`** — unlimited password guessing.
@@ -276,13 +355,13 @@ in-memory backend and assert on `mail.outbox`.
 
 ## Verification status
 
-`npm run build` → `✓ 2087 modules transformed`, `dist/assets/index-*.js` 572.54 kB (gzip 162 kB),
-`dist/assets/index-*.css` 42.31 kB, `✓ built in 4.2s`. `python manage.py test` → **Ran 57 tests … OK**
-(44 s; system check reported no
-issues). All 57 live in `apps/core/tests.py`: 13 services and seeding, 12 newsletter double opt-in,
-17 campaign engine, 15 admin email API. The campaign tests run on a throw-away database with Django's
-in-memory email backend — nothing in the suite can reach a real mailbox, and `db.sqlite3` is not
-touched by them.
+`npm run build` → `✓ 2092 modules transformed`, `dist/assets/index-*.js` 608.20 kB (gzip 172.00 kB),
+`dist/assets/index-*.css` 44.83 kB, `✓ built in 6.3s`. `python manage.py check` → no issues;
+`python manage.py test apps` → **Ran 85 tests … OK** (182 s). The suite is still one module,
+`apps/core/tests.py`: services and seeding, newsletter double opt-in, the campaign engine, the admin
+email API, the landlord portal's access rules, and 17 tests for the recommendation queue. The
+campaign tests run on a throw-away database with Django's in-memory email backend — nothing in the
+suite can reach a real mailbox, and `db.sqlite3` is not touched by them.
 
 The brochure wording pass was verified against the running dev server over HTTP: `/api/services/`
 returns the four published offers with their `icon` keys and slugs
@@ -326,12 +405,32 @@ subscriber list → 405. The live install reports `email_backend: "console.Email
 `sends_real_mail: false`, which is the banner the campaigns screen renders. The smoke draft created
 for that check was deleted afterwards; the tables are empty again.
 
-**Not verified:** the brochure wording and the new badge/arc motifs looked at in a browser — the
-automation browser is still refused by permission in this session, so the service badges, the arc
-divider and the About values band are covered by a clean build and by the classes being present in
-`dist/assets/index-*.css`, not by a screenshot; the campaign screens clicked through in a browser as an ADMIN (the automation
-browser was refused by permission in this session — the render path, the modals and the queue/cancel
-affordances are covered by tests and by a clean build, not by a screenshot); a real campaign run of
+The recommendation flow was walked through in the browser end to end, on the dev server, as the
+people who actually use it. As the landlord Joseph: the portal rail showed "Recommend a property",
+the list started empty, the form saved to `/landlord/recommendations/1/edit`, and "Send to the desk"
+left the row reading "Submitted to the desk · sent 20 Oct 2026" with the form still openable but
+clearly his own copy. As the desk (admin `Sarah Nakato`): `/manage/recommendations` listed the row
+under "Waiting on the desk 1", "Due diligence" moved it to "In due diligence 1" and emptied the first
+tab, and the decision modal showed every answer — owner, phone, offer, kind, bed/bath, size, address,
+plot reference, expectation with its period, ownership, occupancy, papers, viewing contact, the note
+and the description he wrote. Verifying it with a note published the listing at once:
+`GET /api/properties/?search=Naalya` returned it as id 12 / `MB-P00012`, SALE, AVAILABLE,
+`is_published: true`, owner Joseph, UGX 260,000,000, and
+`/properties/two-bedroom-maisonette-naalya` rendered it publicly with the honest "no photography
+uploaded yet" placeholder rather than a borrowed picture. A second recommendation (submitted by the
+other owner, Aisha) was turned down from the same modal: an empty reason came back from the server as
+"This field may not be blank." against the field, and a real reason left Aisha's portal showing
+"Declined", the desk's note under "The desk wrote:", every input disabled, a disabled Save, `PATCH`
+refused with 400 and `GET /api/landlord/recommendations/1/` (Joseph's row) answered 404. Two crashes
+surfaced during this pass and were fixed: both new tables were passing their row renderer as
+children instead of `renderRow`, which blanked the page.
+
+**Not verified:** the brochure wording and the new badge/arc motifs seen as a picture — the in-app
+browser in this session renders a 543×426 viewport and one full-page capture was refused
+(`NATIVE_BROWSER_VIEWPORT_UNAVAILABLE`), so those surfaces were read from accessibility snapshots and
+from the classes being present in `dist/assets/index-*.css`, not from a desktop screenshot; the
+campaign screens clicked through in a browser as an ADMIN (the render path, the modals and the
+queue/cancel affordances are covered by tests and by a clean build, not by a screenshot); a real campaign run of
 `send_email_campaign` against live data, because there are no confirmed subscribers on this install;
 desktop-width rendering of the newsletter band (the automation browser sat at a 543×426 viewport, so
 only the stacked mobile layout was screenshotted and measured); delivery of a real email —

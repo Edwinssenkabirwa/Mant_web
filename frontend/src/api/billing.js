@@ -10,6 +10,11 @@ export function statements(params) {
   return get('/statements/', params)
 }
 
+/** The owner's own view of his book: aggregates only, no tenant records. */
+export function landlordOverview(params) {
+  return get('/landlord/overview/', params)
+}
+
 /* ---------- Invoices ------------------------------------------------------ */
 
 export function listInvoices(params) {

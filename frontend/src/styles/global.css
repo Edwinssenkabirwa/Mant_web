@@ -18,6 +18,12 @@
   --red-500: #e8475c;
   --red-100: #fbdde1;
 
+  /* Sampled from the key in the logo: the bright edge of the blade and the body of it. The
+     darker one is the only one that keeps white button text at AA contrast. */
+  --brand-blue: #0194f2;
+  --brand-blue-600: #0063cc;
+  --brand-blue-700: #004da1;
+
   --ink: #10203a;
   --ink-soft: #46586f;
   /* Was #74839a, which sat at 3.4:1 on the page ground and failed AA for body-sized text. */
@@ -1000,16 +1006,19 @@ hr {
   object-fit: contain;
 }
 
-/* What visitors actually arrive for, as links instead of a sentence about it. */
+/* What visitors actually arrive for, listed one under the other instead of wrapped as pills. */
 .hero-focus {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .hero-focus-link {
   display: inline-flex;
   align-items: center;
+  width: 100%;
+  max-width: 380px;
   padding: 9px 17px;
   border-radius: var(--radius-pill);
   border: 1px solid rgba(255, 255, 255, 0.34);
@@ -1030,6 +1039,46 @@ hr {
   color: var(--navy-100);
   font-size: 1.08rem;
   max-width: 58ch;
+}
+
+/* Wordmark and the sentence that explains it, side by side. The logo card is white, so the tagline
+   carries its own white text on the navy band rather than sitting on that card. Declared after
+   .hero p so the two rules, which tie on specificity, resolve in favour of the tagline. */
+.hero-brand {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: clamp(16px, 2.4vw, 30px);
+}
+
+.hero-brand .hero-logo {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.hero-tagline {
+  flex: 1 1 250px;
+  min-width: 0;
+}
+
+.hero-tagline strong {
+  display: block;
+  color: #fff;
+  font-size: 1.3rem;
+  letter-spacing: 0.01em;
+  margin-bottom: 6px;
+}
+
+.hero-tagline p {
+  color: #fff;
+  font-size: 0.97rem;
+  line-height: 1.55;
+  margin: 0 0 6px;
+  max-width: 44ch;
+}
+
+.hero-tagline p:last-child {
+  margin-bottom: 0;
 }
 
 .hero-grid {
@@ -1083,10 +1132,10 @@ hr {
     165deg,
     rgba(6, 26, 51, 0.95) 0%,
     rgba(11, 37, 69, 0.93) 48%,
-    rgba(29, 67, 115, 0.93) 100%
+    rgba(0, 88, 178, 0.93) 100%
   );
-  border: 1px solid rgba(215, 226, 239, 0.26);
-  border-top: 4px solid var(--red-600);
+  border: 1px solid rgba(1, 148, 242, 0.34);
+  border-top: 4px solid var(--brand-blue);
   border-radius: var(--radius-lg);
   padding: 22px;
   box-shadow: var(--shadow-lg);
@@ -1107,7 +1156,25 @@ hr {
 .search-panel .input,
 .search-panel .select {
   background-color: #fff;
-  border-color: rgba(215, 226, 239, 0.55);
+  border-color: rgba(1, 148, 242, 0.5);
+}
+
+.search-panel .input:focus,
+.search-panel .select:focus {
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(1, 148, 242, 0.32);
+}
+
+/* The desk's own action reads as the logo's blue; the deeper one keeps the white
+   label above AA contrast, which the bright blade blue would not. */
+.search-panel .btn-accent {
+  --btn-bg: var(--brand-blue-600);
+  --btn-border: var(--brand-blue-600);
+}
+
+.search-panel .btn-accent:hover:not(:disabled) {
+  background: var(--brand-blue-700);
+  border-color: var(--brand-blue-700);
 }
 
 .search-panel .hint,
@@ -2974,6 +3041,45 @@ hr {
   border-top-right-radius: 50% 100%;
   pointer-events: none;
 }
+
+/* The navy arch every public page opens with. */
+.page-band {
+  position: relative;
+  background: var(--navy-800);
+  color: #fff;
+  padding: 44px 0 74px;
+}
+
+.page-band .eyebrow { color: #ffb3bd; }
+.page-band h1 { color: #fff; max-width: 26ch; }
+.page-band .band-lead { color: var(--navy-100); font-size: 1.08rem; max-width: 72ch; margin: 0; }
+
+.page-band .breadcrumb,
+.page-band .breadcrumb a { color: rgba(255, 255, 255, 0.62); }
+.page-band .breadcrumb a:hover { color: #fff; }
+
+.page-band .hint,
+.page-band .muted,
+.page-band .mono,
+.page-band .location-line,
+.page-band .location-line a { color: var(--navy-100); }
+.page-band .location-line a:hover { color: #fff; }
+.page-band .property-price { color: #fff; }
+
+/* Status chips have to survive the navy: the pale ones go translucent white, the
+   dark ones invert, and red keeps its own meaning. */
+.page-band .badge {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.26);
+  color: #fff;
+}
+.page-band .badge-navy { background: #fff; color: var(--navy-800); }
+.page-band .badge-red { background: var(--red-600); border-color: var(--red-600); color: #fff; }
+
+/* Service icon, writer avatar and the article meta rule all assume a pale page. */
+.page-band .service-badge { background: #fff; color: var(--navy-800); }
+.page-band .avatar { background: rgba(255, 255, 255, 0.2); }
+.page-band .article-head { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
 
 .hero-mission {
   display: inline-block;

@@ -8,7 +8,7 @@ import { companyLogo, mediaUrl } from '../../utils/media.js'
 import { dateLabel } from '../../utils/format.js'
 import PostCard from '../../components/blog/PostCard.jsx'
 import NewsletterSignup from '../../components/common/NewsletterSignup.jsx'
-import { Breadcrumb, Callout, Avatar } from '../../components/ui/Blocks.jsx'
+import { ArcBand, Callout, Avatar } from '../../components/ui/Blocks.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { ErrorState, Loading } from '../../components/ui/Feedback.jsx'
 import { isNotFound } from '../../api/client.js'
@@ -36,18 +36,15 @@ export default function BlogPost() {
   if (!post) return null
 
   return (
-    <article className="container section-tight stack">
-      <Breadcrumb
-        items={[
+    <>
+      <ArcBand
+        crumbs={[
           { label: 'Home', to: '/' },
           { label: 'Blog', to: '/blog' },
           { label: post.category_name || 'Article' },
         ]}
-      />
-
-      <div className="split">
-        <div className="stack">
-          <header className="article">
+        title={
+          <>
             <div className="row" style={{ gap: 8 }}>
               {post.category_slug ? (
                 <Link to={`/blog?category=${post.category_slug}`} className="badge badge-navy">
@@ -56,7 +53,7 @@ export default function BlogPost() {
               ) : null}
               {post.is_featured ? <span className="badge badge-red">Featured</span> : null}
             </div>
-            <h1 style={{ marginTop: 12, marginBottom: 10 }}>{post.title}</h1>
+            <h1>{post.title}</h1>
             <div className="article-head row" style={{ gap: 16, flexWrap: 'wrap' }}>
               <span className="row" style={{ gap: 8 }}>
                 <CalendarDays size={14} aria-hidden="true" />
@@ -75,100 +72,108 @@ export default function BlogPost() {
                 </span>
               ) : null}
             </div>
+          </>
+        }
+      />
 
-            {post.cover_image_url ? (
-              <img
-                src={mediaUrl(post.cover_image_url)}
-                alt=""
-                className="cover-img"
-                onError={(event) => {
-                  event.currentTarget.style.display = 'none'
-                }}
-              />
-            ) : null}
+      <article className="container section-tight stack">
+        <div className="split">
+          <div className="stack">
+            <header className="article">
+              {post.cover_image_url ? (
+                <img
+                  src={mediaUrl(post.cover_image_url)}
+                  alt=""
+                  className="cover-img"
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none'
+                  }}
+                />
+              ) : null}
 
-            <div className="article-body" style={{ marginTop: 22 }}>
-              {(post.paragraphs ?? []).map((paragraph, index) => (
-                <p key={`${post.slug}-${index}`}>{paragraph}</p>
-              ))}
-            </div>
-
-            {post.tags?.length ? (
-              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                {post.tags.map((tag) => (
-                  <Link key={tag} to={`/blog?tag=${encodeURIComponent(tag)}`} className="chip">
-                    #{tag}
-                  </Link>
+              <div className="article-body" style={{ marginTop: 22 }}>
+                {(post.paragraphs ?? []).map((paragraph, index) => (
+                  <p key={`${post.slug}-${index}`}>{paragraph}</p>
                 ))}
               </div>
-            ) : null}
 
-            {post.allow_comments ? (
-              <Callout>
-                <span className="row" style={{ gap: 8 }}>
-                  <MessageSquareOff size={15} aria-hidden="true" />
-                  This article is marked as open for comments, but the site has no comment API yet.{' '}
-                  <Link to="/contact">Write to the desk</Link> instead.
-                </span>
-              </Callout>
-            ) : null}
-          </header>
+              {post.tags?.length ? (
+                <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                  {post.tags.map((tag) => (
+                    <Link key={tag} to={`/blog?tag=${encodeURIComponent(tag)}`} className="chip">
+                      #{tag}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
 
-          <NewsletterSignup variant="card" source="blog-article" />
+              {post.allow_comments ? (
+                <Callout>
+                  <span className="row" style={{ gap: 8 }}>
+                    <MessageSquareOff size={15} aria-hidden="true" />
+                    This article is marked as open for comments, but the site has no comment API yet.{' '}
+                    <Link to="/contact">Write to the desk</Link> instead.
+                  </span>
+                </Callout>
+              ) : null}
+            </header>
+
+            <NewsletterSignup variant="card" source="blog-article" />
+          </div>
+
+          <aside className="sticky-side stack">
+            <div className="card">
+              <div className="card-head">
+                <h3>About the writer</h3>
+              </div>
+              <div className="card-body stack stack-sm">
+                <div className="row" style={{ gap: 10 }}>
+                  <Avatar user={post.author} />
+                  <div>
+                    <p className="bold" style={{ margin: 0 }}>
+                      {post.author?.full_name ?? post.author_name}
+                    </p>
+                    <p className="muted small" style={{ margin: 0 }}>
+                      {post.author?.role === 'ADMIN' ? 'Mant Bridges LTD' : 'Contributor'}
+                    </p>
+                  </div>
+                </div>
+                <p className="muted small" style={{ margin: 0 }}>
+                  {company?.name ?? 'Mant Bridges LTD'} — Bridging gaps. Building value.
+                </p>
+                {companyLogo(company) ? (
+                  <img src={companyLogo(company)} alt="" style={{ maxHeight: 44, objectFit: 'contain' }} />
+                ) : null}
+                <Button to="/contact" variant="outline" block size="sm">
+                  Ask about this topic
+                </Button>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-body stack stack-sm">
+                <Button to="/properties" variant="link" block size="sm">
+                  Browse current listings
+                </Button>
+                <Button to="/blog" variant="outline" block size="sm">
+                  All articles
+                </Button>
+              </div>
+            </div>
+          </aside>
         </div>
 
-        <aside className="sticky-side stack">
-          <div className="card">
-            <div className="card-head">
-              <h3>About the writer</h3>
+        {post.related_posts?.length ? (
+          <section className="stack stack-sm">
+            <h2>Related reading</h2>
+            <div className="auto-grid">
+              {post.related_posts.map((item) => (
+                <PostCard key={item.id} post={item} />
+              ))}
             </div>
-            <div className="card-body stack stack-sm">
-              <div className="row" style={{ gap: 10 }}>
-                <Avatar user={post.author} />
-                <div>
-                  <p className="bold" style={{ margin: 0 }}>
-                    {post.author?.full_name ?? post.author_name}
-                  </p>
-                  <p className="muted small" style={{ margin: 0 }}>
-                    {post.author?.role === 'ADMIN' ? 'Mant Bridges LTD' : 'Contributor'}
-                  </p>
-                </div>
-              </div>
-              <p className="muted small" style={{ margin: 0 }}>
-                {company?.name ?? 'Mant Bridges LTD'} — Bridging gaps. Building value.
-              </p>
-              {companyLogo(company) ? (
-                <img src={companyLogo(company)} alt="" style={{ maxHeight: 44, objectFit: 'contain' }} />
-              ) : null}
-              <Button to="/contact" variant="outline" block size="sm">
-                Ask about this topic
-              </Button>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-body stack stack-sm">
-              <Button to="/properties" variant="link" block size="sm">
-                Browse current listings
-              </Button>
-              <Button to="/blog" variant="outline" block size="sm">
-                All articles
-              </Button>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      {post.related_posts?.length ? (
-        <section className="stack stack-sm">
-          <h2>Related reading</h2>
-          <div className="auto-grid">
-            {post.related_posts.map((item) => (
-              <PostCard key={item.id} post={item} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-    </article>
+          </section>
+        ) : null}
+      </article>
+    </>
   )
 }

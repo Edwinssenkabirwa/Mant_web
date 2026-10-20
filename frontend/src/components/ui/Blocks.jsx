@@ -154,6 +154,26 @@ export function PageHeader({ eyebrow, title, lead, actions, breadcrumb }) {
   )
 }
 
+/**
+ * The navy arch band a public page opens with — the one the services page uses.
+ * Anything a page needs above the fold (badges, a price, a date line) goes in `children`.
+ */
+export function ArcBand({ eyebrow, title, lead, crumbs, actions, children }) {
+  return (
+    <section className="page-band">
+      <div className="container stack">
+        {crumbs ? <Breadcrumb items={crumbs} /> : null}
+        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+        {typeof title === 'string' ? <h1>{title}</h1> : title}
+        {lead ? <p className="band-lead">{lead}</p> : null}
+        {actions ? <div className="row" style={{ gap: 10 }}>{actions}</div> : null}
+        {children}
+      </div>
+      <span className="arc-swoosh" aria-hidden="true" />
+    </section>
+  )
+}
+
 export function Callout({ children, tone = 'red', className = '' }) {
   return <div className={`callout${tone === 'navy' ? ' callout-navy' : ''} ${className}`.trim()}>{children}</div>
 }

@@ -56,8 +56,9 @@ business requires it.
 
 **Current state:** creating or editing a lease needs a tenant, resolved from
 `GET /api/leases/options/`. For an ADMIN that returns all tenants; a LANDLORD only receives the
-tenants already linked to their own leases. A landlord taking on a brand-new tenant therefore
-cannot complete the lease form — the UI shows an explanatory `Callout` instead of a broken picker.
+tenants already linked to their own leases. Since the landlord portal cutover the lease screen is
+not offered to owners at all — the desk records every tenancy — so this gap now only matters if
+landlord lease authoring is brought back.
 
 **Proposed (choose one and tell me which):**
 - `GET /api/manage/tenants/` scoped to `LANDLORD`, returning a minimal public profile
@@ -68,14 +69,14 @@ cannot complete the lease form — the UI shows an explanatory `Callout` instead
 The second option is the safer one: it avoids exposing the whole tenant register to every
 landlord on the platform.
 
-**Related:** `POST /api/manage/properties/` requires `owner` for an ADMIN. Landlords get their
-own account injected. If invites exist, the owner field should follow the same rule.
+**Related:** `POST /api/manage/properties/` requires `owner` for an ADMIN. Landlords no longer
+create property rows from the UI at all; the recommendation flow is the intended route in.
 
 ## 5. Landlord read access to enquiries (medium)
 
 **Current state:** the enquiry inbox is `IsAdminRole` only (`/api/manage/enquiries/`). A landlord
-cannot see who asked about their own building. `pages/manage/Enquiries.jsx` is therefore mounted
-under an ADMIN-only route and the landlord sidebar omits it.
+cannot see who asked about their own building, and `/manage/*` is closed to the landlord role in
+both the router and Django, so the inbox simply does not exist for owners.
 
 **Proposed:** keep the endpoint admin-only but add `GET /api/manage/enquiries/mine/` filtered to
 `property__owner=request.user`, or relax the viewset queryset the same way
@@ -246,6 +247,80 @@ SPF, DKIM and DMARC records; `DEFAULT_FROM_EMAIL`, `PUBLIC_SITE_URL` and the `EM
 `backend/.env`. Do not claim real delivery until a message has been received at Gmail, Yahoo and
 Outlook addresses from that configuration. `/api/manage/email/campaigns/stats/` reports the live
 backend so the UI can say so plainly until then.
+
+## 17. Documents an owner can hold (medium — the landlord portal reports numbers only)
+
+**Built now:** `GET /api/landlord/overview/` (`apps/billing/services.landlord_overview`) answers the
+owner's portal with aggregates of his own book — invoiced, collected, outstanding, overdue, the
+monthly trend and per-property occupancy — and the rent book itself (`/api/invoices/`,
+`/api/payments/`, `/api/receipts/`, `/api/leases/`, `/api/analytics/`, `/api/statements/`) now refuses
+the LANDLORD role with 403 through `IsAdminOrTenant`. Receipts are tenant-facing documents ("Received
+from: …"), so nothing in the system yet documents a payout *to* an owner.
+
+**Still missing:**
+
+1. **An owner statement/report the office generates** — collection by property and month, plus what
+   has been released to him. It must be server-rendered, authorization-checked per owner, and served
+   through a view, never a bare media URL.
+2. **A payout record model.** `Receipt` cannot be reused: it names the tenant and is created by
+   `billing/signals.sync_receipt` on every confirmed payment. An owner-facing document needs its own
+   model (owner, period, amount released, method, reference, prepared_by) and its own PDF.
+3. **The wording on the portal** currently points an owner to messages for any document; update
+   `pages/landlord/Overview.jsx` when 1 and 2 exist.
+
+## 18. Property recommendations (medium — what the desk still does by hand)
+
+**Built now:** `PropertyRecommendation` (`apps/properties/models.py`, migration
+`properties.0003`) carries the owner's form through `DRAFT → SUBMITTED → IN_REVIEW → VERIFIED /
+DECLINED`. Owners write and send it at `/api/landlord/recommendations/` (`IsLandlordRole`, queryset
+scoped to `recommender=request.user`); the desk works the queue at
+`/api/manage/recommendations/` (`IsAdminRole`) with `review/`, `verify/`, `decline/` and `stats/`.
+`apps/properties/services.py` is the only place a listing is created from a recommendation:
+`verify_recommendation()` writes the `Property` in one transaction, owned by the recommender,
+published immediately, and refuses to run twice. Landlords have no write path to
+`/api/manage/properties/` or the image endpoint at all (`IsAdminRole` on create/update/delete).
+`apps/accounts/signals.py` opens a blank DRAFT with every landlord account and a NEW `Enquiry` with
+every tenant account.
+
+**Still missing:**
+
+1. **`Enquiry` has no `user` foreign key.** The tenant-account enquiry is matched to its person by
+   e-mail address only, so it cannot be listed as "their brief" in the portal or re-opened when the
+   person edits their details. Adding the FK needs a data pass over existing rows.
+2. **The queue screen exposes the decision fields only.** `PATCH /api/manage/recommendations/:id/`
+   accepts every field (and `/django-admin/` shows them), so a typo in an owner's title or price can
+   be corrected there — but there is no inline editor in `/manage/recommendations`.
+3. **Nobody is told when a decision lands.** The owner reads `admin_note` in his portal; no e-mail or
+   WhatsApp goes out. That belongs with the alert service in item 16.
+4. **Existing landlord accounts have no draft form.** The signal fires on account creation only, so
+   owners registered before it (including the demo users) start with an empty list. A one-off
+   `manage.py` backfill would fix it; it was not run because it writes rows into real accounts.
+5. **A declined recommendation cannot be re-opened by the desk.** The owner's form locks on decision
+   and the next attempt is a new recommendation. `verify/` on a DECLINED row is refused, by design.
+6. **Verification publishes immediately** — there is no "verified, hold for the owner's signature"
+   state, and no second listing for a property recommended "for sale and to rent"; the desk picks one
+   listing type per verification.
+
+## 19. Private PDFs sit in public media (medium, security)
+
+**Confirmed live, not inferred:** with the dev server running, an unauthenticated
+
+```
+GET /media/receipts/2026/10/receipts/2026/10/MB-RCP-2026-00022_SR1ENXH.pdf
+```
+
+answers `200 application/pdf`. The file is a real payment receipt for a named tenant.
+
+**Why:** `Receipt.generate_pdf()` writes into `MEDIA_ROOT`, and `config/urls.py` appends
+`static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)` whenever `DEBUG` is on — so every
+document under `media/` is reachable by URL, with no role check, for anyone who knows or guesses
+the path. The API path is correct (`/api/receipts/{id}/download/` scopes the queryset to the
+tenant or the office), but it is not the only door.
+
+**The fix:** keep documents out of the media tree. Give `Receipt.pdf` its own storage rooted at a
+`DOCUMENT_ROOT` outside `MEDIA_ROOT` (and outside any static file server), so the authenticated
+view is the only way out. Existing rows under `media/receipts/` need moving, and the property
+photos must stay where they are — those are meant to be public.
 
 ---
 

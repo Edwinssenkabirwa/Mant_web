@@ -1,4 +1,4 @@
-import { del, get, patch, post, put, upload } from './client.js'
+import { del, get, patch, patchUpload, post, put } from './client.js'
 
 /* ---------- Public website ------------------------------------------------ */
 
@@ -38,12 +38,12 @@ export function deleteService(id) {
 }
 
 /**
- * The image is an ImageField, so a freshly picked file travels as multipart on
- * its own; text edits stay JSON because a multipart body cannot carry the
- * `highlights` list.
+ * The image is an ImageField, so a freshly picked file travels as a multipart PATCH on its
+ * own and the text edits travel as JSON. The detail route has no POST handler — only
+ * retrieve, update, partial update and delete — so this is the verb that replaces a picture.
  */
 export function uploadServiceImage(id, file) {
   const form = new FormData()
   form.append('image', file)
-  return upload(`/manage/services/${id}/`, form)
+  return patchUpload(`/manage/services/${id}/`, form)
 }

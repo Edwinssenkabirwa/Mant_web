@@ -241,12 +241,6 @@ class PaymentSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"invoice": "Select the invoice you are paying."}
                 )
-        elif user is not None and user.role == Role.LANDLORD:
-            lease = attrs.get("lease") or (invoice.lease if invoice is not None else None)
-            if lease is not None and lease.landlord_id != user.pk:
-                raise serializers.ValidationError(
-                    {"lease": "You can only record payments for your own tenancies."}
-                )
         return attrs
 
     def create(self, validated_data):

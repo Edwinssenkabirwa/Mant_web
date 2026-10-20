@@ -4,7 +4,7 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 import { confirmNewsletter, unsubscribeNewsletter } from '../../api/newsletter.js'
 import { describeError } from '../../api/client.js'
 import NewsletterSignup from '../../components/common/NewsletterSignup.jsx'
-import { Breadcrumb } from '../../components/ui/Blocks.jsx'
+import { ArcBand } from '../../components/ui/Blocks.jsx'
 import { Loading } from '../../components/ui/Feedback.jsx'
 
 const COPY = {
@@ -68,16 +68,12 @@ export default function NewsletterLink({ kind }) {
   if (state.phase === 'loading') return <Loading label={copy.pending} />
 
   return (
-    <div className="container section-tight stack">
-      <Breadcrumb
-        items={[{ label: 'Home', to: '/' }, { label: 'Blog', to: '/blog' }, { label: copy.label }]}
-      />
-      <div className="card">
-        <div className="card-body stack">
-          <p className="eyebrow" style={{ marginBottom: 0 }}>
-            {copy.label}
-          </p>
-          <h1 style={{ marginTop: 0 }}>
+    <div className="stack">
+      <ArcBand
+        crumbs={[{ label: 'Home', to: '/' }, { label: 'Blog', to: '/blog' }, { label: copy.label }]}
+        eyebrow={copy.label}
+        title={
+          <h1>
             {state.phase === 'done' ? (
               <span className="row" style={{ gap: 10 }}>
                 <CheckCircle2 size={22} aria-hidden="true" />
@@ -90,19 +86,19 @@ export default function NewsletterLink({ kind }) {
               </span>
             )}
           </h1>
-          <p className="lead" style={{ margin: 0 }}>
-            {state.message}
-          </p>
-        </div>
-      </div>
+        }
+        lead={state.message}
+      />
 
       {state.phase === 'error' && kind === 'confirm' ? (
-        <NewsletterSignup
-          variant="card"
-          source="expired-link"
-          title="Request a new confirmation link"
-          blurb="Confirmation links expire and can only be used once. Subscribe again with the same address and we will send a fresh link."
-        />
+        <div className="container section-tight">
+          <NewsletterSignup
+            variant="card"
+            source="expired-link"
+            title="Request a new confirmation link"
+            blurb="Confirmation links expire and can only be used once. Subscribe again with the same address and we will send a fresh link."
+          />
+        </div>
       ) : null}
     </div>
   )

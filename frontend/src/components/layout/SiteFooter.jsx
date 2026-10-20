@@ -67,7 +67,7 @@ export function SiteFooter() {
             <h4>Account</h4>
             <Link to="/login">Sign in</Link>
             <Link to="/register">Open an account</Link>
-            <Link to="/manage">Landlord dashboard</Link>
+            <Link to="/landlord">Landlord portal</Link>
             <Link to="/portal">Tenant portal</Link>
             <Link to="/contact">Contact the desk</Link>
           </div>

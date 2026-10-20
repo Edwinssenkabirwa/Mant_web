@@ -84,20 +84,24 @@ export default function Home() {
         <div className="container">
           <div className="hero-grid">
             <div className="stack hero-rise">
-              <p className="eyebrow" style={{ color: '#ffb3bd' }}>
-                Kampala · Uganda
-              </p>
-              <h1 className="hero-logo">
-                {heroLogo ? (
-                  <img
-                    src={heroLogo}
-                    alt={`${company?.name || 'Mant Bridges LTD'} — Bridging gaps. Building value.`}
-                    fetchPriority="high"
-                  />
-                ) : (
-                  'Bridging gaps'
-                )}
-              </h1>
+              <div className="hero-brand">
+                <h1 className="hero-logo">
+                  {heroLogo ? (
+                    <img
+                      src={heroLogo}
+                      alt={`${company?.name || 'Mant Bridges LTD'} — Bridging gaps. Building value.`}
+                      fetchPriority="high"
+                    />
+                  ) : (
+                    'Bridging gaps'
+                  )}
+                </h1>
+                <div className="hero-tagline">
+                  <strong>Bridging Gaps</strong>
+                  <p>We build bridges of trust, create lasting value and close every gap between you and your goals.</p>
+                  <p>We are your trusted partner in managing properties, unlocking opportunities and delivering results.</p>
+                </div>
+              </div>
               <div className="hero-focus">
                 {heroLinks.map((item) => (
                   <Link key={item.label} to={item.to} className="hero-focus-link">
@@ -130,10 +134,6 @@ export default function Home() {
                   <Link to="/properties?listing_type=SALE">
                     <div className="hero-stat-value">{stats.data.for_sale}</div>
                     <div className="hero-stat-label">For sale</div>
-                  </Link>
-                  <Link to="/about#locations">
-                    <div className="hero-stat-value">{stats.data.cities}</div>
-                    <div className="hero-stat-label">Locations covered</div>
                   </Link>
                 </div>
               ) : null}
@@ -184,7 +184,7 @@ export default function Home() {
                 <Search size={17} /> Search property
               </Button>
               <p className="hint" style={{ margin: 0 }}>
-                Availability shown here comes from live listings published by our landlords and team.
+                Availability shown here comes from live listings verified by our landlords and verified by our team.
               </p>
               <p className="hero-note" style={{ margin: 0 }}>
                 The neighbourhood picture above is an illustrative render, not a photograph of a listed property.
@@ -266,7 +266,6 @@ export default function Home() {
             <div>
               <p className="eyebrow">Featured listings</p>
               <h2>Hand-picked by our property team</h2>
-              <p>Every listing below is published on the Mant Bridges books, with the landlord and status on record.</p>
             </div>
             <Button to="/properties" variant="outline">
               All properties <ArrowRight size={16} />
