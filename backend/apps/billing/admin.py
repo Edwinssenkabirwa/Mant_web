@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from apps.billing.models import Invoice, Payment, Receipt
+from apps.billing.models import Invoice, Payment, Receipt, RentReminder
 from apps.billing.services import apply_late_fees, refresh_overdue_invoices
 
 
@@ -101,3 +101,27 @@ class ReceiptAdmin(admin.ModelAdmin):
         if not obj.pdf:
             return "not generated"
         return format_html('<a href="{}" target="_blank">Download</a>', obj.pdf.url)
+
+
+@admin.register(RentReminder)
+class RentReminderAdmin(admin.ModelAdmin):
+    """Written by the rent desk's reminder actions, never by hand.
+
+    ``status`` stops at what this application can see: a WhatsApp row records that the desk
+    opened a chat, not that the tenant received anything.
+    """
+
+    list_display = ("invoice", "channel", "status", "phone", "created_by", "opened_at",
+                    "created_at")
+    list_filter = ("channel", "status", "created_at")
+    search_fields = ("invoice__number", "invoice__tenant__first_name",
+                     "invoice__tenant__last_name", "invoice__tenant__email", "phone")
+    readonly_fields = ("invoice", "channel", "status", "body", "phone", "opened_at",
+                       "created_by", "created_at", "updated_at")
+    date_hierarchy = "created_at"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

@@ -154,7 +154,8 @@ campaign where it stopped; each recipient gets at most 3 attempts before it is m
 
 ## API surface consumed by the frontend
 
-95 endpoints under `/api` (enumerated from the URLconf). Groups the SPA uses daily:
+109 distinct routes under `/api` — enumerated from the URLconf with `django.urls.get_resolver()` and
+the format-suffix duplicates dropped. Groups the SPA uses daily:
 
 - `GET /api/company/`, `/api/lookups/`, `/api/health/` — profile, vocabularies, liveness
 - `/api/properties/` (+`featured/`, `cities/`, `stats/`, `<slug>/`) — public catalogue, hidden
@@ -166,7 +167,9 @@ campaign where it stopped; each recipient gets at most 3 attempts before it is m
 - `/api/manage/{properties,property-images,posts,blog-categories,enquiries,users}/`,
   `/api/manage/properties/stats/`, `/api/manage/posts/stats/` — staff CRUD (role-gated)
 - `/api/leases/` (+`options/`, `stats/`, `{id}/generate-invoices/`, `{id}/statement/`)
-- `/api/invoices/` (+`generate/`, `summary/`, `{id}/{pdf,remind,apply-late-fee}/`)
+- `/api/invoices/` (+`generate/`, `summary/`, `{id}/{pdf,remind,whatsapp-reminder,apply-late-fee}/`)
+- `/api/reminders/` (+`{id}/opened/`) — the desk's own record of every rent reminder raised; admin
+  read-only, `?invoice=` scopes it to one invoice
 - `/api/payments/` (+`summary/`, `{id}/{confirm,reject}/`), `/api/receipts/` (+`{id}/{download,void}/`)
 - `/api/statements/`, `/api/analytics/` — server-aggregated reporting
 - `/api/conversations/` (+`recipients/`, `unread-count/`, `{id}/{messages,mark-read,close}/`)
@@ -196,7 +199,8 @@ Complete and wired to real data:
 `/newsletter/confirm?token=…` · `/newsletter/unsubscribe?token=…` ·
 `/login` · `/register` · `/manage` · `/manage/reports` ·
 `/manage/properties` (+`new`, `:id/edit`) · `/manage/leases` (+`new`, `:id/edit`) ·
-`/manage/invoices` (+`:id`) · `/manage/payments` · `/manage/receipts` · `/manage/messages` ·
+`/manage/invoices` (+`:id`) · `/manage/reminders` · `/manage/payments` · `/manage/receipts` ·
+`/manage/messages` ·
 `/manage/profile` · `/manage/password` · `/manage/users` · `/manage/enquiries` ·
 `/manage/posts` (+`new`, `:id/edit`) · `/manage/categories` ·
 `/manage/services` (+`new`, `:id/edit`, `:id/preview`) · `/manage/email/campaigns` ·
@@ -262,6 +266,44 @@ Built but deliberately limited, because the backend does not support more:
 - Payments are never taken online. Recording one creates a PENDING entry awaiting desk
   confirmation; the tenant portal shows the company's bank/mobile-money instructions.
 - Logout clears the browser session but cannot revoke the token server-side. (follow-up 2)
+
+## Rent reminders
+
+The desk chases rent from two places — an invoice and the arrears list — and both raise the same
+record. [`apps/billing/reminders.py`](backend/apps/billing/reminders.py) is the only renderer:
+`reminder_text(invoice)` produces the words once, so the inbox copy and the WhatsApp copy cannot
+drift apart (a test asserts the two stored bodies are byte-identical).
+
+- `POST /api/invoices/{id}/remind/` writes the reminder into the tenant's own inbox thread
+  (`get_or_create_conversation` + `post_message`) — the tenant sees it in `/portal/messages`.
+- `POST /api/invoices/{id}/whatsapp-reminder/` writes that same inbox copy *and* returns a
+  click-to-chat address built on the server: `https://wa.me/<digits>?text=<url-encoded body>`.
+  The tenant therefore has the words in two places, which is the trade the desk accepted;
+  `RentReminder` rows keep both records.
+- Nothing sends. No WhatsApp Business API is configured and no provider credentials exist anywhere
+  in this repository, so the platform hands a chat to the desk's own phone and the desk presses send
+  there. WhatsApp returns no report, so the status vocabulary stops at `WRITTEN`, `LINK_READY`,
+  `OPENED`, `NO_NUMBER` — `mark_chat_opened()` can only advance `LINK_READY → OPENED`, and the tests
+  pin that vocabulary by name (asserting the four values are exactly those, with "deliver",
+  "received" and "sent" banned from any of them) and assert a reminder response never contains the
+  word "delivered".
+- No number is invented or repaired. `normalise_msisdn()` accepts `+256 704 771 220`,
+  `00256 704 771 220`, `256704771220`, `0704 771 220`, `704771220` and a genuine foreign `+44 …`,
+  and returns `None` for anything else (short, alphabetic, an extension, a bare `+256`). When it
+  returns `None` the endpoint still writes the inbox reminder and answers `link: null` with the
+  number to fix, so a chase is never lost because a phone number was typed badly.
+  `InvoiceSerializer.whatsapp_number` exposes that derived value, which is how
+  `/manage/reminders` can label a row "No usable number" before anyone presses anything.
+- `RentReminder` (migration `billing.0002`) is the trail: invoice, channel `INBOX`/`WHATSAPP`,
+  status, the exact words handed over, the digits the chat was addressed to, who raised it and when.
+  It is registered in `/django-admin/` as read-only, and `GET /api/reminders/` is `IsAdminRole` —
+  a tenant or landlord asking for it is refused. The invoice screen renders it as a **Reminder log**.
+- A settled or cancelled invoice is answered 400 *before* any row is written, so a "reminder" for
+  nothing outstanding cannot be raised even by the API.
+- `/manage/reminders` (`pages/manage/RentReminders.jsx`) works the rent book oldest-first:
+  `GET /api/invoices/?overdue=true` plus `GET /api/invoices/summary/?overdue=true` for the four
+  header figures. Both already existed — the overdue filter and the filter-aware summary — so the
+  list invents no endpoint and derives no total in JavaScript.
 
 ## Newsletter and campaigns
 
@@ -367,13 +409,13 @@ office signs on.
 
 ## Verification status
 
-`npm run build` → `✓ 2092 modules transformed`, `dist/assets/index-*.js` 608.20 kB (gzip 172.00 kB),
-`dist/assets/index-*.css` 44.83 kB, `✓ built in 6.3s`. `python manage.py check` → no issues;
-`python manage.py test apps` → **Ran 85 tests … OK** (182 s). The suite is still one module,
+`npm run build` → `✓ 2097 modules transformed`, `dist/assets/index-*.js` 634.24 kB (gzip 178.18 kB),
+`dist/assets/index-*.css` 46.27 kB, `✓ built in 5.0s`. `python manage.py check` → no issues;
+`python manage.py test apps` → **Ran 101 tests … OK** (105 s). The suite is still one module,
 `apps/core/tests.py`: services and seeding, newsletter double opt-in, the campaign engine, the admin
-email API, the landlord portal's access rules, and 17 tests for the recommendation queue. The
-campaign tests run on a throw-away database with Django's in-memory email backend — nothing in the
-suite can reach a real mailbox, and `db.sqlite3` is not touched by them.
+email API, the landlord portal's access rules, 17 tests for the recommendation queue, and 10 tests
+for rent reminders. The campaign tests run on a throw-away database with Django's in-memory email
+backend — nothing in the suite can reach a real mailbox, and `db.sqlite3` is not touched by them.
 
 The brochure wording pass was verified against the running dev server over HTTP: `/api/services/`
 returns the four published offers with their `icon` keys and slugs
@@ -453,6 +495,18 @@ temporary row plus its uploaded file were removed, so the table is the same five
 orders 1–5 with their original artwork. Console stayed clean apart from the two React Router
 future-flag warnings.
 
+The reminder work was verified against the **running dev server** over HTTP and read-only, because
+raising a reminder on live data writes a real `Message` into a real tenant's thread plus a
+`RentReminder` row: signing in as `admin@mantbridges.com` returned 200 and
+`GET /api/invoices/?overdue=true` returned **13 invoices in arrears** — the
+first page of 12 serialized a dialable `whatsapp_number` for every row (e.g.
+`'+256 700 815 336'` → `256700815336`), with **0 undialable rows on that page** —
+`GET /api/reminders/?invoice=…` returned `200 []` (no reminders raised, as expected), and
+`GET /api/reminders/` with no token returned 401. `normalise_msisdn()` was walked through its
+accepted and rejected shapes in a shell before the endpoints were built. The 10 reminder tests —
+including the refusal of a settled invoice, the tenant/landlord 403s, the idempotent `opened/` trace
+and the "no delivery vocabulary" guard — ran as part of the 101 above, on the test database.
+
 **Not verified:** the brochure wording and the new badge/arc motifs seen as a picture — the in-app
 browser in this session renders a 543×426 viewport and one full-page capture was refused
 (`NATIVE_BROWSER_VIEWPORT_UNAVAILABLE`), so those surfaces were read from accessibility snapshots and
@@ -465,7 +519,11 @@ only the stacked mobile layout was screenshotted and measured); delivery of a re
 `EMAIL_BACKEND` here is the console backend, so no message has ever reached an inbox; the company
 logo upload (it would overwrite the real file); the three services screens seen as a picture at
 desktop width (the same viewport refusal, so they were read from the DOM and from computed styles);
-and any production deployment steps.
+and any production deployment steps; the three reminder surfaces (`/manage/reminders`, the
+"Remind on WhatsApp" dialog on the invoice screen and the Reminder log in its aside) were **not
+clicked through in a browser** — the session's automation was refused permission to navigate, and
+deliberately not worked around, since a click there writes a real message into a real tenant's
+inbox. They are covered by tests and a clean build, not by a screenshot.
 
 **Placeholder assets:** `frontend/public/images/{kampala,landlord,contracting}.jpg` are
 AI-generated stand-ins, not Mant Bridges photography. Replace them before launch.

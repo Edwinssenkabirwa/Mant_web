@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BellRing, Download, Pencil, PlusCircle, Wallet } from 'lucide-react'
+import { ArrowLeft, BellRing, Download, MessageCircle, Pencil, PlusCircle, Wallet } from 'lucide-react'
 import {
   applyLateFee,
   downloadInvoicePdf,
   invoiceById,
   listPayments,
+  listReminders,
   remindInvoice,
 } from '../../api/billing.js'
 import { useApi } from '../../hooks/useApi.js'
@@ -15,6 +16,7 @@ import { useLookups } from '../../context/LookupContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import InvoiceTotals from '../../components/billing/InvoiceTotals.jsx'
 import PaymentModal from '../../components/billing/PaymentModal.jsx'
+import ReminderDialog from '../../components/billing/ReminderDialog.jsx'
 import InvoiceFormModal from '../../components/billing/InvoiceFormModal.jsx'
 import { InvoiceBadge, StatusBadge } from '../../components/ui/Badge.jsx'
 import { Breadcrumb, Callout, KeyValue, PageHeader, Panel } from '../../components/ui/Blocks.jsx'
@@ -34,10 +36,13 @@ export default function InvoiceDetail({ portal = false }) {
   const [payOpen, setPayOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [remindOpen, setRemindOpen] = useState(false)
+  const [whatsOpen, setWhatsOpen] = useState(false)
   const [lateOpen, setLateOpen] = useState(false)
 
   const request = useApi(() => invoiceById(id), [id])
   const payments = useApi(() => listPayments({ invoice: id }), [id])
+  // The trail is the desk's own record; a tenant reads their inbox instead of this endpoint.
+  const trail = useApi(() => listReminders({ invoice: id }), [id], { skip: portal })
 
   const pdf = useAction(async () => downloadInvoicePdf(request.data), {
     onDone: () => toast.success('PDF downloaded.'),
@@ -47,6 +52,7 @@ export default function InvoiceDetail({ portal = false }) {
     async () => {
       const result = await remindInvoice(id)
       request.reload()
+      trail.reload()
       return result
     },
     {
@@ -87,6 +93,7 @@ export default function InvoiceDetail({ portal = false }) {
 
   const currency = invoice.currency || company?.currency || 'UGX'
   const rows = payments.data?.results ?? payments.data ?? []
+  const reminders = trail.data?.results ?? []
   const received = Number(invoice.amount_paid)
   const outstanding = Number(invoice.balance)
 
@@ -239,6 +246,9 @@ export default function InvoiceDetail({ portal = false }) {
           {!portal && outstanding > 0 ? (
             <Panel title="Desk actions">
               <div className="stack stack-sm">
+                <Button block onClick={() => setWhatsOpen(true)}>
+                  <MessageCircle size={15} /> Remind on WhatsApp
+                </Button>
                 <Button block variant="outline" onClick={() => setRemindOpen(true)}>
                   <BellRing size={15} /> Send a rent reminder
                 </Button>
@@ -249,8 +259,9 @@ export default function InvoiceDetail({ portal = false }) {
                   <p className="hint">A late fee can only be added once the due date has passed.</p>
                 ) : null}
                 <p className="hint">
-                  The reminder is delivered as a message in the tenant&apos;s inbox — the platform does not send email
-                  yet.
+                  Both reminder buttons write the same message into the tenant&apos;s inbox. WhatsApp only opens a
+                  chat on your own phone — the platform sends nothing by itself, gets no confirmation back, and the
+                  site does not email.
                 </p>
               </div>
             </Panel>
@@ -281,16 +292,59 @@ export default function InvoiceDetail({ portal = false }) {
               </div>
             </Panel>
           ) : (
-            <Panel title="Collection trail">
-              <KeyValue
-                items={[
-                  { label: 'Reminders sent', value: invoice.reminder_count ?? 0 },
-                  { label: 'Last reminder', value: invoice.last_reminder_at ? dateTimeLabel(invoice.last_reminder_at) : 'none' },
-                  { label: 'Payments recorded', value: (Array.isArray(rows) ? rows.length : 0).toLocaleString() },
-                  { label: 'User', value: `${user?.full_name} (${user?.role})` },
-                ]}
-              />
-            </Panel>
+            <>
+              <Panel title="Collection trail">
+                <KeyValue
+                  items={[
+                    { label: 'Reminders sent', value: invoice.reminder_count ?? 0 },
+                    { label: 'Last reminder', value: invoice.last_reminder_at ? dateTimeLabel(invoice.last_reminder_at) : 'none' },
+                    { label: 'Payments recorded', value: (Array.isArray(rows) ? rows.length : 0).toLocaleString() },
+                    { label: 'User', value: `${user?.full_name} (${user?.role})` },
+                  ]}
+                />
+              </Panel>
+
+              <Panel title="Reminder log">
+                <Table
+                  head={['Raised', 'Channel', 'Record']}
+                  rows={reminders}
+                  loading={trail.loading}
+                  error={trail.error}
+                  onRetry={trail.reload}
+                  empty={<p className="muted small">No reminder has been raised on this invoice.</p>}
+                  renderRow={(reminder) => (
+                    <tr key={reminder.id}>
+                      <Td className="tiny">
+                        {dateTimeLabel(reminder.created_at)}
+                        <span className="tiny muted" style={{ display: 'block' }}>
+                          {reminder.created_by_name || 'the desk'}
+                        </span>
+                      </Td>
+                      <Td>
+                        {reminder.channel_display}
+                        {reminder.phone ? (
+                          <span className="tiny muted" style={{ display: 'block' }}>
+                            +{reminder.phone}
+                          </span>
+                        ) : null}
+                      </Td>
+                      <Td>
+                        <StatusBadge value={reminder.status} label={reminder.status_display} />
+                        {reminder.opened_at ? (
+                          <span className="tiny muted" style={{ display: 'block' }}>
+                            clicked {dateTimeLabel(reminder.opened_at)}
+                          </span>
+                        ) : null}
+                      </Td>
+                    </tr>
+                  )}
+                />
+                <p className="hint">
+                  A WhatsApp entry says the desk was handed a chat and whether it was clicked here. WhatsApp never
+                  reports back to this platform, so nothing in this log can mean the tenant received the message.
+                </p>
+              </Panel>
+            </>
           )}
         </aside>
       </div>
@@ -329,6 +383,18 @@ export default function InvoiceDetail({ portal = false }) {
         onConfirm={() => remind.execute()}
         onClose={() => setRemindOpen(false)}
       />
+
+      {!portal ? (
+        <ReminderDialog
+          invoice={invoice}
+          open={whatsOpen}
+          onClose={() => setWhatsOpen(false)}
+          onSent={() => {
+            request.reload()
+            trail.reload()
+          }}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={lateOpen}

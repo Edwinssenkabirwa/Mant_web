@@ -47,6 +47,11 @@ const TONES = {
   ACCEPTED: 'ok',
   FAILED: 'bad',
   SKIPPED: 'outline',
+  // rent reminders — how far the desk's own record goes, never a claim about the tenant
+  WRITTEN: 'info',
+  LINK_READY: 'warn',
+  OPENED: 'ok',
+  NO_NUMBER: 'bad',
   // misc
   TRUE: 'ok',
 };

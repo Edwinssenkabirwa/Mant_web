@@ -53,6 +53,26 @@ export function remindInvoice(id) {
   return post(`/invoices/${id}/remind/`, {})
 }
 
+/**
+ * Writes the reminder into the tenant's inbox and returns the WhatsApp click-to-chat address
+ * along with the exact words. `link` is null when the number on file cannot be dialled — the
+ * inbox copy still goes out. No response here means the tenant received anything: WhatsApp is
+ * opened by the desk and sent by the desk.
+ */
+export function whatsappReminder(id) {
+  return post(`/invoices/${id}/whatsapp-reminder/`, {})
+}
+
+/** The desk's trail of reminders, optionally scoped with `{ invoice: id }`. */
+export function listReminders(params) {
+  return get('/reminders/', params)
+}
+
+/** Records that the desk clicked the chat link — the furthest this platform can see. */
+export function markReminderOpened(id) {
+  return post(`/reminders/${id}/opened/`, {})
+}
+
 export function applyLateFee(id) {
   return post(`/invoices/${id}/apply-late-fee/`, {})
 }

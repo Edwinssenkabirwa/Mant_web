@@ -3,7 +3,8 @@ from rest_framework import serializers
 
 from apps.accounts.models import Role
 from apps.accounts.serializers import UserBriefSerializer
-from apps.billing.models import Invoice, Payment, Receipt
+from apps.billing.models import Invoice, Payment, Receipt, RentReminder
+from apps.billing.reminders import normalise_msisdn
 from apps.core.helpers import format_money, to_decimal
 
 
@@ -44,6 +45,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
     effective_status = serializers.CharField(read_only=True)
     effective_status_display = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    # The tenant's number already dialable as-is, or "" when it is missing or unreadable. The
+    # desk's arrears list reads this to know before it clicks; nothing here repairs a number.
+    whatsapp_number = serializers.SerializerMethodField()
 
     total_display = serializers.SerializerMethodField()
     balance_display = serializers.SerializerMethodField()
@@ -64,12 +68,15 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "total_display", "balance_display", "amount_paid_display",
             "status", "status_display", "effective_status", "effective_status_display",
             "days_overdue", "is_overdue", "notes", "reminder_count", "last_reminder_at",
-            "payments", "created_at", "updated_at",
+            "whatsapp_number", "payments", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "number", "created_at", "updated_at"]
 
     def get_effective_status_display(self, obj):
         return Invoice.Status(obj.effective_status).label
+
+    def get_whatsapp_number(self, obj):
+        return normalise_msisdn(obj.tenant.phone) or ""
 
     def get_total_display(self, obj):
         return format_money(obj.total, obj.currency)
@@ -154,6 +161,23 @@ class ManageInvoiceSerializer(serializers.ModelSerializer):
         if not validated_data.get("due_date"):
             validated_data["due_date"] = validated_data["period_end"]
         return super().create(validated_data)
+
+
+class RentReminderSerializer(serializers.ModelSerializer):
+    """The desk's trail of reminders. Read-only: a reminder is created by sending it."""
+
+    channel_display = serializers.CharField(source="get_channel_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    invoice_number = serializers.CharField(source="invoice.number", read_only=True)
+    tenant_name = serializers.CharField(source="invoice.tenant.full_name", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.full_name", read_only=True,
+                                           default="")
+
+    class Meta:
+        model = RentReminder
+        fields = ["id", "invoice", "invoice_number", "tenant_name", "channel", "channel_display",
+                  "status", "status_display", "phone", "body", "opened_at", "created_by_name",
+                  "created_at"]
 
 
 class PaymentSerializer(serializers.ModelSerializer):

@@ -7,11 +7,13 @@ from apps.billing.views import (
     LandlordOverviewView,
     PaymentViewSet,
     ReceiptViewSet,
+    RentReminderViewSet,
     StatementView,
 )
 
 router = DefaultRouter()
 router.register("invoices", InvoiceViewSet, basename="invoice")
+router.register("reminders", RentReminderViewSet, basename="rent-reminder")
 router.register("payments", PaymentViewSet, basename="payment")
 router.register("receipts", ReceiptViewSet, basename="receipt")
 

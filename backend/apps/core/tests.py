@@ -21,7 +21,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Role, User
-from apps.billing.models import Invoice, Payment
+from apps.billing.models import Invoice, Payment, RentReminder
+from apps.billing.reminders import normalise_msisdn, reminder_text
 from apps.core.models import (
     Company,
     EmailCampaign,
@@ -33,6 +34,7 @@ from apps.core.services import campaigns, newsletter
 from apps.core.services.documents import render_invoice_pdf, render_receipt_pdf
 from apps.core.testing import ApiTestCase
 from apps.leases.models import Lease
+from apps.messaging.models import Message
 from apps.messaging.services import get_or_create_conversation
 from apps.properties.models import Enquiry, Property, PropertyRecommendation
 
@@ -1564,4 +1566,194 @@ class LetterheadTests(ApiTestCase):
         page = drawn_text(self.sample(render_invoice_pdf))
         self.assertIn("Mant Bridges LTD", page)
         self.assertIn("Bridging Gaps", page)
+
+
+class RentReminderTests(ApiTestCase):
+    """Rent reminders on two channels. The inbox copy is written by this platform, so it can be
+    recorded as written. A WhatsApp chat is opened by the desk's own browser and sent by the desk,
+    so the record stops at "a link was handed over" and "the link was clicked" — never delivered."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email="desk@example.test", password="Passw0rd!", role=Role.ADMIN,
+            first_name="Ada", last_name="Admin",
+        )
+        self.landlord = User.objects.create_user(
+            email="owner@example.test", password="Passw0rd!", role=Role.LANDLORD,
+            first_name="Len", last_name="Owner",
+        )
+        self.tenant = User.objects.create_user(
+            email="renter@example.test", password="Passw0rd!", role=Role.TENANT,
+            first_name="Tom", last_name="Renter", phone="+256 704 771 220",
+        )
+
+    def overdue_invoice(self, paid=None):
+        """One tenancy, one invoice already past its due date."""
+        month_start, month_end = last_month()
+        prop = Property.objects.create(
+            owner=self.landlord, title="Nakawa apartment", description="A test unit.",
+            price=1_000_000, address="1 Test Road", city="Kampala",
+            status=Property.Status.OCCUPIED,
+        )
+        lease = Lease.objects.create(
+            property=prop, tenant=self.tenant, landlord=self.landlord,
+            start_date=month_start.replace(day=1),
+            end_date=month_end.replace(year=month_end.year + 5), monthly_rent=1_000_000,
+        )
+        invoice = Invoice.objects.create(
+            lease=lease, property=prop, tenant=self.tenant, landlord=self.landlord,
+            period_start=month_start, period_end=month_end, issue_date=month_start,
+            due_date=timezone.localdate() - timedelta(days=12), rent_amount=1_000_000,
+        )
+        if paid:
+            Payment.objects.create(
+                invoice=invoice, lease=lease, tenant=self.tenant, amount=paid,
+                status=Payment.Status.CONFIRMED, paid_on=month_start,
+                recorded_by=self.admin, confirmed_by=self.admin,
+            )
+            invoice.refresh_from_db()
+        return invoice
+
+    def raise_whatsapp_reminder(self, invoice, user=None):
+        self.client.force_authenticate(user or self.admin)
+        return self.client.post(
+            f"/api/invoices/{invoice.pk}/whatsapp-reminder/", {}, format="json"
+        )
+
+    def test_only_a_number_that_can_actually_be_dialled_is_accepted(self):
+        for written, expected in [
+            ("+256 704 771 220", "256704771220"),
+            ("00256 704 771 220", "256704771220"),
+            ("256704771220", "256704771220"),
+            ("0704 771 220", "256704771220"),
+            ("704771220", "256704771220"),
+            ("+44 20 7946 0958", "442079460958"),
+        ]:
+            self.assertEqual(normalise_msisdn(written), expected, written)
+
+        for unusable in ("", "   ", None, "0704 771", "+256", "my phone",
+                         "0704 771 220 ext 4"):
+            self.assertIsNone(normalise_msisdn(unusable), repr(unusable))
+
+    def test_the_whatsapp_action_writes_the_inbox_and_returns_a_chat_address(self):
+        invoice = self.overdue_invoice()
+        response = self.raise_whatsapp_reminder(invoice)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        self.assertEqual(data["link"].split("?")[0], "https://wa.me/256704771220")
+        self.assertIn("Dear%20Tom", data["link"])
+        self.assertEqual(data["status"], RentReminder.Status.LINK_READY)
+        self.assertIn("no confirmation", data["detail"])
+
+        message = Message.objects.get(conversation__participants=self.tenant)
+        self.assertEqual(message.body.strip(), data["body"].strip())
+        self.assertIn(invoice.number, message.body)
+        self.assertIn(f"{invoice.days_overdue} days overdue", message.body)
+
+        reminder = RentReminder.objects.get(pk=data["reminder_id"])
+        self.assertEqual(reminder.channel, RentReminder.Channel.WHATSAPP)
+        self.assertEqual(reminder.phone, "256704771220")
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.reminder_count, 1)
+        self.assertIsNotNone(invoice.last_reminder_at)
+
+    def test_both_channels_send_the_identical_words(self):
+        invoice = self.overdue_invoice()
+        self.client.force_authenticate(self.admin)
+        self.client.post(f"/api/invoices/{invoice.pk}/remind/", {}, format="json")
+        self.raise_whatsapp_reminder(invoice)
+
+        bodies = list(Message.objects.order_by("id").values_list("body", flat=True))
+        self.assertEqual(len(bodies), 2)
+        self.assertEqual(bodies[0], reminder_text(invoice))
+        self.assertEqual(bodies[1], reminder_text(invoice))
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.reminder_count, 2)
+
+    def test_an_unusable_number_still_leaves_the_inbox_copy(self):
+        invoice = self.overdue_invoice()
+        self.tenant.phone = "0704 771"
+        self.tenant.save()
+
+        data = self.raise_whatsapp_reminder(invoice).json()
+        self.assertIsNone(data["link"])
+        self.assertEqual(data["status"], RentReminder.Status.NO_NUMBER)
+        self.assertIn("cannot be dialled", data["detail"])
+        self.assertEqual(Message.objects.count(), 1)
+
+        reminder = RentReminder.objects.get()
+        self.assertEqual(reminder.status, RentReminder.Status.NO_NUMBER)
+        self.assertEqual(reminder.phone, "")
+
+    def test_a_settled_invoice_is_not_reminded_about(self):
+        invoice = self.overdue_invoice(paid=1_000_000)
+        self.assertEqual(float(invoice.balance), 0)
+
+        response = self.raise_whatsapp_reminder(invoice)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(RentReminder.objects.count(), 0)
+        self.assertEqual(Message.objects.count(), 0)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.reminder_count, 0)
+
+    def test_the_record_stops_at_the_desk_clicking_the_link(self):
+        data = self.raise_whatsapp_reminder(self.overdue_invoice()).json()
+        path = f"/api/reminders/{data['reminder_id']}/opened/"
+
+        self.client.force_authenticate(self.admin)
+        opened = self.client.post(path, {}, format="json").json()
+        self.assertEqual(opened["status"], RentReminder.Status.OPENED)
+        self.assertIsNotNone(opened["opened_at"])
+        self.assertNotIn("delivered", json.dumps(opened).lower())
+
+        again = self.client.post(path, {}, format="json").json()
+        self.assertEqual(again["opened_at"], opened["opened_at"])
+
+    def test_only_the_desk_can_raise_or_read_reminders(self):
+        invoice = self.overdue_invoice()
+        for other in (self.tenant, self.landlord):
+            self.assertEqual(
+                self.raise_whatsapp_reminder(invoice, user=other).status_code, 403, other.role
+            )
+            self.client.force_authenticate(other)
+            self.assertEqual(self.client.get("/api/reminders/").status_code, 403, other.role)
+
+        self.client.force_authenticate(user=None)
+        self.assertEqual(
+            self.client.post(f"/api/invoices/{invoice.pk}/whatsapp-reminder/", {}).status_code,
+            401,
+        )
+        self.assertEqual(self.client.get("/api/reminders/").status_code, 401)
+
+    def test_the_desk_reads_the_dialable_number_off_the_invoice(self):
+        invoice = self.overdue_invoice()
+        self.client.force_authenticate(self.admin)
+        row = self.client.get(f"/api/invoices/{invoice.pk}/").json()
+        self.assertEqual(row["whatsapp_number"], "256704771220")
+
+        self.tenant.phone = "not a number"
+        self.tenant.save()
+        row = self.client.get(f"/api/invoices/{invoice.pk}/").json()
+        self.assertEqual(row["whatsapp_number"], "")
+
+    def test_the_trail_is_scoped_to_one_invoice(self):
+        first, second = self.overdue_invoice(), self.overdue_invoice()
+        self.raise_whatsapp_reminder(first)
+        self.client.force_authenticate(self.admin)
+        self.client.post(f"/api/invoices/{second.pk}/remind/", {}, format="json")
+
+        rows = self.client.get(f"/api/reminders/?invoice={first.pk}").json()["results"]
+        self.assertEqual([row["invoice"] for row in rows], [first.pk])
+        self.assertEqual(rows[0]["channel_display"], "WhatsApp click-to-chat")
+        self.assertEqual(len(self.client.get("/api/reminders/").json()["results"]), 2)
+
+    def test_the_model_vocabulary_has_no_room_for_a_delivery_claim(self):
+        values = {choice[0] for choice in RentReminder.Status.choices}
+        self.assertEqual(values, {"WRITTEN", "LINK_READY", "OPENED", "NO_NUMBER"})
+        joined = " ".join(values).lower()
+        for banned in ("deliver", "received", "sent"):
+            self.assertNotIn(banned, joined)
 

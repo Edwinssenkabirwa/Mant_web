@@ -1,5 +1,3 @@
-from functools import partial
-
 from django.db.models import F, Sum
 from django.http import FileResponse
 from django.utils import timezone
@@ -12,13 +10,19 @@ from rest_framework.views import APIView
 from apps.accounts.models import Role, User
 from apps.accounts.permissions import IsAdminOrTenant, IsAdminRole, IsLandlordRole
 from apps.billing.filters import InvoiceFilter, PaymentFilter, ReceiptFilter
-from apps.billing.models import ZERO, Invoice, Payment, Receipt
+from apps.billing.models import ZERO, Invoice, Payment, Receipt, RentReminder
+from apps.billing.reminders import (
+    mark_chat_opened,
+    open_whatsapp_reminder,
+    send_inbox_reminder,
+)
 from apps.billing.serializers import (
     InvoiceSerializer,
     ManageInvoiceSerializer,
     PaymentSerializer,
     ReceiptSerializer,
     RejectPaymentSerializer,
+    RentReminderSerializer,
     VoidReceiptSerializer,
 )
 from apps.billing.services import (
@@ -29,10 +33,8 @@ from apps.billing.services import (
     scope_for,
     tenant_statement,
 )
-from apps.core.helpers import format_money
 from apps.core.services.documents import render_invoice_pdf
 from apps.leases.models import Lease
-from apps.messaging.services import get_or_create_conversation, post_message
 from apps.properties.models import Property
 
 OUTSTANDING = F("total") - F("amount_paid")
@@ -74,7 +76,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy", "remind",
-                           "apply_late_fee", "generate"):
+                           "whatsapp_reminder", "apply_late_fee", "generate"):
             return [IsAuthenticated(), IsAdminRole()]
         return super().get_permissions()
 
@@ -102,35 +104,50 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def remind(self, request, pk=None):
         """Send the tenant a rent reminder through the platform inbox."""
         invoice = self.get_object()
-        money = partial(format_money, currency_symbol=invoice.currency)
-        conversation = get_or_create_conversation(
-            participants=[invoice.tenant, request.user],
-            subject=f"Rent reminder - {invoice.number}",
-            created_by=request.user,
-            property_obj=invoice.property,
-            lease=invoice.lease,
-        )
-        body = (
-            f"Dear {invoice.tenant.short_name},\n\n"
-            f"This is a reminder from Mant Bridges LTD regarding invoice {invoice.number} "
-            f"for {invoice.property.title}, covering {invoice.period_label}.\n\n"
-            f"Amount charged: {money(invoice.total)}\n"
-            f"Received to date: {money(invoice.amount_paid)}\n"
-            f"Outstanding balance: {money(invoice.balance)}\n"
-            f"Due date: {invoice.due_date:%d %b %Y}"
-            + (f" ({invoice.days_overdue} days overdue)" if invoice.is_overdue else "")
-            + "\n\nPlease pay at your earliest convenience and quote the invoice number. "
-              "If you have already paid, send us the transaction reference so we can "
-              "reconcile your account and issue your receipt.\n\n"
-              "Regards,\nMant Bridges LTD"
-        )
-        post_message(conversation, request.user, body)
-        invoice.mark_reminder_sent()
+        reminder, conversation = send_inbox_reminder(invoice, request.user)
         return Response({
             "detail": "Reminder sent to the tenant.",
             "conversation_id": conversation.pk,
             "invoice_number": invoice.number,
             "reminder_count": invoice.reminder_count,
+        })
+
+    @action(detail=True, methods=["post"], url_path="whatsapp-reminder")
+    def whatsapp_reminder(self, request, pk=None):
+        """Write the reminder into the tenant's inbox and hand the desk a WhatsApp chat to open.
+
+        The answer is the same set of words whichever channel is used, and the ``link`` is only
+        an address for the desk's browser to open: WhatsApp tells this application nothing, so
+        the response never claims the tenant received it. When the number on file cannot be
+        dialled the inbox copy still goes out and ``link`` comes back null.
+        """
+        invoice = self.get_object()
+        if invoice.balance <= ZERO or invoice.status == Invoice.Status.CANCELLED:
+            return Response(
+                {"detail": "Nothing is outstanding on this invoice, so there is nothing to "
+                           "remind about."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        reminder, conversation, link = open_whatsapp_reminder(invoice, request.user)
+        tenant_name = invoice.tenant.full_name
+        detail = (
+            f"Written to {tenant_name}'s inbox, and the chat is ready to open. Press send in "
+            f"WhatsApp yourself — the platform gets no confirmation from WhatsApp."
+            if link else
+            f"Written to {tenant_name}'s inbox, but the number on file "
+            f"({invoice.tenant.phone or 'nothing recorded'}) cannot be dialled. Correct it on "
+            f"the tenant's account, e.g. +256 704 771 220."
+        )
+        return Response({
+            "detail": detail,
+            "conversation_id": conversation.pk,
+            "invoice_number": invoice.number,
+            "reminder_count": invoice.reminder_count,
+            "reminder_id": reminder.pk,
+            "status": reminder.status,
+            "phone": reminder.phone,
+            "link": link,
+            "body": reminder.body,
         })
 
     @action(detail=False, methods=["post"])
@@ -169,6 +186,31 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 due_date__year=today.year, due_date__month=today.month
             ).count(),
         })
+
+
+class RentReminderViewSet(viewsets.ReadOnlyModelViewSet):
+    """What the desk has raised on each invoice, and how far the record honestly goes.
+
+    Administrators only: a reminder row quotes the tenant's number and the words sent, and the
+    trail belongs to the collection desk rather than to either party's own screens.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminRole]
+    serializer_class = RentReminderSerializer
+
+    def get_queryset(self):
+        queryset = RentReminder.objects.select_related("invoice", "invoice__tenant",
+                                                       "created_by")
+        invoice_id = self.request.query_params.get("invoice")
+        if invoice_id:
+            queryset = queryset.filter(invoice_id=invoice_id)
+        return queryset
+
+    @action(detail=True, methods=["post"])
+    def opened(self, request, pk=None):
+        """The desk clicked the chat link. Nothing may be read from this as delivery."""
+        reminder = mark_chat_opened(self.get_object())
+        return Response(self.get_serializer(reminder).data)
 
 
 class PaymentViewSet(viewsets.ModelViewSet):

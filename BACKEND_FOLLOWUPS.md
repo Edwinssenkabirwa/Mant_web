@@ -324,6 +324,45 @@ photos must stay where they are — those are meant to be public.
 
 ---
 
+## 20. Rent reminders (built as click-to-chat — what still needs a provider)
+
+**Built now:** `apps/billing/reminders.py` renders the words once (`reminder_text`) and is the only
+place a reminder is composed. `POST /api/invoices/{id}/remind/` writes them into the tenant's inbox
+thread; `POST /api/invoices/{id}/whatsapp-reminder/` writes the same copy and returns a server-built
+`https://wa.me/<E.164>?text=…` link. `normalise_msisdn()` accepts the shapes the register actually
+contains and returns `None` rather than guessing, in which case the endpoint answers `link: null`
+and the inbox reminder still exists. `RentReminder` (`billing.0002`) records channel, status, body,
+the digits used and who raised it, `GET /api/reminders/` is admin-only, and `/manage/reminders` plus
+the Reminder log on the invoice screen read from it. Statuses stop at `WRITTEN`, `LINK_READY`,
+`OPENED`, `NO_NUMBER`.
+
+**Still missing:**
+
+1. **Outbound sending.** There is no WhatsApp Business API call, so a human still presses send on a
+   phone. Real automation needs a provider (Meta's Cloud API or a gateway), a credentials-in-`.env`
+   change, and a delivery webhook — at which point a `SENT`/`DELIVERED` status becomes defensible.
+   Until a provider confirms something, the platform must keep saying "a chat was opened here".
+2. **Consent and quiet hours.** Nothing records whether a tenant agreed to be chased on WhatsApp. A
+   rent reminder to a personal number is still a message to a person, and the data-protection rules
+   that apply to it have not been checked here; a `whatsapp_opt_in` flag on the tenant profile, plus
+   a cap on reminders per invoice per week, belongs here before volume grows.
+3. **The double copy.** By design an inbox-plus-WhatsApp reminder reaches the tenant twice with the
+   same words. If that reads as spam, either the WhatsApp channel should skip the inbox write, or the
+   inbox post should be marked internal — that is a product decision, not a bug.
+4. **No number hygiene pass.** `normalise_msisdn` refuses to repair, so rows recorded as
+   `+256 7XX XXX XXX` with stray punctuation are handled, but a tenant saved as `0704 771` or a
+   landline stays `NO_NUMBER` forever until someone edits the profile. A one-off report of tenants
+   whose phone will not dial would let the desk fix them; it has not been run because it reads PII
+   across the whole register.
+5. **Nothing scheduled.** A nightly `mark_overdue` could also queue reminders for freshly overdue
+   invoices (item 11), and the reminder trail has no link to the campaign/alert engine in item 16 —
+   an email reminder path would reuse the same `reminder_text` with a channel of `EMAIL`.
+6. **Landlords never see it.** The trail is `IsAdminRole`, and the owner's portal deliberately reports
+   totals only. If an owner is expected to chase his own tenant, that needs its own scoped endpoint —
+   and its own consent answer.
+
+---
+
 ### Also worth noting, without UI impact today
 
 - `DEBUG`, `SECRET_KEY` and SQLite all come from `.env`; production needs

@@ -30,6 +30,7 @@ import Leases from './pages/manage/Leases.jsx'
 import LeaseForm from './pages/manage/LeaseForm.jsx'
 import Invoices from './pages/manage/Invoices.jsx'
 import InvoiceDetail from './pages/manage/InvoiceDetail.jsx'
+import RentReminders from './pages/manage/RentReminders.jsx'
 import Payments from './pages/manage/Payments.jsx'
 import Receipts from './pages/manage/Receipts.jsx'
 import Enquiries from './pages/manage/Enquiries.jsx'
@@ -94,6 +95,7 @@ export default function App() {
             <Route path="manage/leases/:id/edit" element={<LeaseForm />} />
             <Route path="manage/invoices" element={<Invoices />} />
             <Route path="manage/invoices/:id" element={<InvoiceDetail />} />
+            <Route path="manage/reminders" element={<RentReminders />} />
             <Route path="manage/payments" element={<Payments />} />
             <Route path="manage/receipts" element={<Receipts />} />
             <Route path="manage/messages" element={<Messages />} />

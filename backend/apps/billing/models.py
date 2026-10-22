@@ -266,6 +266,49 @@ class Invoice(TimeStampedModel):
         }
 
 
+class RentReminder(TimeStampedModel):
+    """One reminder the desk raised on one invoice, and the channel it went out on.
+
+    The statuses stop short of the tenant by design. ``WRITTEN`` means a message exists in this
+    application's own inbox. ``LINK_READY`` and ``OPENED`` describe the desk's screen: WhatsApp
+    returns nothing to this server, so no row here can ever claim the message was delivered,
+    read or even sent. ``NO_NUMBER`` is recorded when the tenant's phone could not be read as a
+    dialable number — the inbox copy still goes out.
+    """
+
+    class Channel(models.TextChoices):
+        INBOX = "INBOX", "Platform inbox"
+        WHATSAPP = "WHATSAPP", "WhatsApp click-to-chat"
+
+    class Status(models.TextChoices):
+        WRITTEN = "WRITTEN", "Written to the tenant's inbox"
+        LINK_READY = "LINK_READY", "Chat handed to the desk"
+        OPENED = "OPENED", "Chat opened by the desk"
+        NO_NUMBER = "NO_NUMBER", "No usable WhatsApp number"
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="reminders")
+    channel = models.CharField(max_length=10, choices=Channel.choices, default=Channel.INBOX,
+                               db_index=True)
+    status = models.CharField(max_length=11, choices=Status.choices, default=Status.WRITTEN,
+                              db_index=True)
+    body = models.TextField(help_text="The exact words the desk was given.")
+    phone = models.CharField(
+        max_length=40, blank=True, default="",
+        help_text="Digits the chat was addressed to, as E.164 without the plus. Blank when no "
+                  "number could be read.",
+    )
+    opened_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                   null=True, blank=True, related_name="rent_reminders")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [models.Index(fields=["invoice", "channel"])]
+
+    def __str__(self):
+        return f"{self.invoice_id} {self.channel} ({self.status})"
+
+
 class Payment(TimeStampedModel):
     """Money received from a tenant. Confirmed payments allocate to an invoice."""
 
