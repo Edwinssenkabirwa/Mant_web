@@ -1,0 +1,36 @@
+# Apache rules for the Django side on shared hosting. Two blocks, two different places.
+# Upload as a file literally named .htaccess. Whether a Passenger-routed domain honours
+# these at all is host-dependent, so after installing each one, prove it with an anonymous
+# request (curl -I https://api.mantbridges.com/<path>) and confirm you get 403 or 404.
+
+# ---------------------------------------------------------------------------
+# 1. Put this in the Application root (the directory holding manage.py) if that
+#    directory is reachable over the web at all. The database, the secrets file and
+#    the source must never be downloadable.
+# ---------------------------------------------------------------------------
+
+<FilesMatch "\.(sqlite3|sqlite3-journal|env|key|pem|py|pyc|log)$">
+  Require all denied
+</FilesMatch>
+
+<Files ".htaccess">
+  Require all denied
+</Files>
+
+# ---------------------------------------------------------------------------
+# 2. Put this in the MEDIA directory (backend/media/.htaccess).
+#
+#    Receipt PDFs and chat attachments are saved inside MEDIA_ROOT next to the
+#    property photographs, which are meant to be public. The API gates them properly
+#    (/api/receipts/{id}/download/ checks the role) but a direct file URL does not go
+#    through the API, and the filenames are sequential receipt numbers, so they are
+#    guessable: /media/receipts/.../MB-RCP-2026-00017.pdf.
+#
+#    This blocks those two subtrees and leaves the photographs alone. It is a stopgap;
+#    BACKEND_FOLLOWUPS.md 19 is the permanent fix (documents out of the media tree).
+#    If the photographs and documents must stay on one host, this rule is what keeps the
+#    money documents private.
+# ---------------------------------------------------------------------------
+
+RewriteEngine On
+RewriteRule ^(receipts|messages|avatars)(/|$) - [F,L]

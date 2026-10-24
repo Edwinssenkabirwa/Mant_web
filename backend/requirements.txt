@@ -1,15 +1,25 @@
 # Mant Bridges LTD - backend dependencies
-# Tested with Python 3.11/3.12/3.13. Install with:  pip install -r requirements.txt
+#
+# Pinned to the exact versions the suite passed against locally (101 tests, Django 5.2.18).
+# Install with:  pip install -r requirements.txt
+#
+# Python floor: django-filter needs 3.11+, Django needs 3.10+. Build the server's
+# virtualenv with whatever cPanel offers at 3.11 or above - a virtualenv copied from
+# Windows never works, it has to be created on the host.
 
-Django>=5.1,<5.3
-djangorestframework>=3.15,<4.0
-djangorestframework-simplejwt>=5.3,<6.0
-django-cors-headers>=4.4,<5.0
-django-filter>=24.2
-drf-spectacular>=0.27,<1.0
-Pillow>=10.4
-reportlab>=4.2,<5.0
-python-dotenv>=1.0,<2.0
+Django==5.2.18
+djangorestframework==3.18.3
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+django-filter==26.2
+drf-spectacular==0.30.0
+Pillow==12.3.0
+reportlab==4.5.1
+python-dotenv==1.2.4
 
-# PostgreSQL driver - uncomment to run on PostgreSQL instead of SQLite:
-# psycopg[binary]>=3.2,<4.0
+# Everything above has wheels for Linux, so no compiler is needed on a shared server.
+# There is deliberately no database driver: the application runs on SQLite, which ships
+# with Python. If this deployment ever moves to PostgreSQL or MySQL, add the driver here
+# and test it on the host before switching DB_ENGINE.
+# psycopg[binary]>=3.2,<4.0   # PostgreSQL only
+# PyMySQL>=1.1                 # MySQL/MariaDB only, if the plan offers it

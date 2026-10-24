@@ -84,6 +84,20 @@ editor labels it "Notes for the desk" and says so — but the service cards and 
 rendering the "Honest limits" note, and migration `core.0009` removed the two body sections that read
 the same way: "The line we hold" on debt recovery and "Where our role stops" on land documentation.
 
+### Listing artwork
+
+`backend/seed_images/properties/<slug>.jpg` holds one AI-generated render per listing that has no
+photograph of its own. `python manage.py attach_illustrative_images` matches each file to its listing
+by slug and attaches it as a `PropertyImage` with `is_illustrative=True`, the caption "Illustrative
+render — not a photograph of this property." and alt text naming the title; `--dry-run` reports the
+matches, and a listing that already has an illustrative render is skipped, so the command is safe to
+re-run. Nothing is deleted, and the public listing page plus the search card print an "Illustrative
+render" badge straight from that flag.
+
+One caution when adding a render to a listing that already has photographs: `PropertyImage.save()`
+keeps exactly one primary per listing, so the new render takes the cover. Run `--dry-run` first, and
+use the desk's cover switch on the listing if an owner's photograph should stay on top.
+
 ### `backend/.env`
 
 | Variable | Purpose |
@@ -99,6 +113,21 @@ the same way: "The line we hold" on debt recovery and "Where our role stops" on 
 | `NEWSLETTER_CONFIRM_HOURS` | how long a confirmation link stays valid (default 72) |
 | `NEWSLETTER_SUBSCRIBE_RATE`, `NEWSLETTER_TOKEN_RATE` | per-IP DRF rate limits on the public newsletter endpoints |
 | `LOG_LEVEL` | root logger level |
+
+Production switches, all of which default to the development behaviour and are documented in
+`DEPLOYMENT.md` section 4:
+
+| Variable | Purpose |
+| --- | --- |
+| `CORS_ALLOW_CREDENTIALS` | now `False` unless set — the SPA authorises with a Bearer header, never cookies |
+| `CSRF_TRUSTED_ORIGINS` | explicit `https://` origins, only if something sends cookies across origins |
+| `DJANGO_TRUSTED_SSL_HEADER` | `header,value` (e.g. `HTTP_X_FORWARDED_PROTO,on`) so media and email links are built as `https` behind the host's SSL termination. Unset by default: trusting a header the front end does not set is a vulnerability, not a shortcut |
+| `DJANGO_API_DOCS` | serves `/api/schema/` and `/api/docs/`. Follows `DEBUG`, so production 404s them unless you ask — they list every route the platform has |
+| `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_SECURE_HSTS_SECONDS` | both off in production until HTTPS is proved by hand; the first loops the site behind a proxy that reports plain http, the second is cached by browsers and cannot be recalled |
+
+`DJANGO_SECRET_KEY` is now fatal-if-wrong: with `DJANGO_DEBUG=False` and a missing, short or
+development key, Django raises `ImproperlyConfigured` at import instead of booting in a state you
+would not want public.
 
 `.gitignore` already excludes `.env`, `db.sqlite3`, `media/`, `.venv/`, `node_modules/`, `dist/`.
 
@@ -120,6 +149,14 @@ same-origin: no CORS preflight, no absolute media URLs, uploaded images resolve 
 | `VITE_BACKEND_URL` | move the dev proxy if Django runs elsewhere |
 | `VITE_MEDIA_BASE_URL` | prefix media with a CDN/object-store origin in production |
 | `VITE_API_BASE_URL` | API origin when the SPA is not served behind the same host |
+
+The last two are baked into the bundle at build time, so they belong in `frontend/.env.production`
+created *before* `npm run build` — and with the single-domain layout neither is needed, because
+`/api` and `/media` are already same-origin paths.
+
+`public/.htaccess` ships inside `dist/` and is what makes a refresh on `/properties/<slug>` render
+the page instead of a 404; it excludes `/api`, `/media`, `/static` and `/django-admin` on purpose,
+because those falling through to `index.html` turns every JSON call into a 200 full of HTML.
 
 Media is portable by design: the API returns `request.build_absolute_uri()` paths, and
 `frontend/src/utils/media.js` reduces them to a pathname and re-prefixes only if
@@ -404,18 +441,41 @@ office signs on.
   that way if you add a tenant directory.
 - `DEBUG`, `SECRET_KEY`, DB engine and CORS come from `.env`. Production also needs real
   `ALLOWED_HOSTS`, `python manage.py collectstatic`, a non-local media store and HTTPS.
+- **A missing `.env` no longer boots quietly.** With `DJANGO_DEBUG=False` and a short, absent or
+  development `DJANGO_SECRET_KEY`, settings raise `ImproperlyConfigured` at import. Before this,
+  the same host came up in debug mode on a key that is published in this repository.
+- **`/api/schema/` and `/api/docs/` follow `DEBUG`** (`DJANGO_API_DOCS` overrides either way). They
+  enumerate every route including the desk's and the landlords', so production 404s them.
 - `manage.py runserver` is a development server. If you start it with `--noreload`, remember it
   will not pick up backend edits — that cost a debugging cycle here.
+- The shared-hosting walk-through — cPanel Python app, `passenger_wsgi.py`, SQLite placement, the
+  Apache rules that keep `/media/receipts` off the public web, cron lines for the three management
+  commands, and what to do when it 500s — is `DEPLOYMENT.md`. Its final table marks every check
+  PASS, FAIL or NOT VERIFIED; nothing there has been run against a real host.
 
 ## Verification status
 
 `npm run build` → `✓ 2097 modules transformed`, `dist/assets/index-*.js` 634.24 kB (gzip 178.18 kB),
-`dist/assets/index-*.css` 46.27 kB, `✓ built in 5.0s`. `python manage.py check` → no issues;
-`python manage.py test apps` → **Ran 101 tests … OK** (105 s). The suite is still one module,
+`dist/assets/index-*.css` 46.39 kB, `✓ built in 6.0s`. `python manage.py check` → no issues;
+`python manage.py test apps.core` → **Ran 101 tests … OK** (114 s). The suite is still one module,
 `apps/core/tests.py`: services and seeding, newsletter double opt-in, the campaign engine, the admin
 email API, the landlord portal's access rules, 17 tests for the recommendation queue, and 10 tests
 for rent reminders. The campaign tests run on a throw-away database with Django's in-memory email
 backend — nothing in the suite can reach a real mailbox, and `db.sqlite3` is not touched by them.
+
+The shared-hosting pass (2026-10-22) was verified the same way, locally and against the running dev
+servers. `manage.py check --deploy` under `DJANGO_DEBUG=False` with a generated key: **81 findings,
+of which 79 are `drf_spectacular` schema-annotation warnings** and two are the deliberate `security`
+ones (`W004` HSTS off, `W008` SSL redirect off — see `BACKEND_FOLLOWUPS.md` 21).
+`makemigrations --check --dry-run` → *No changes detected*. `collectstatic` → 154 files. Importing
+`passenger_wsgi` the way Passenger does → `WSGIHandler`, and with `DEBUG=False` the resolved URL map
+still has `/api/health/`, `/django-admin/` and `/api/receipts/{id}/download/` while `/api/docs/` and
+`/api/schema/` return 404; in development both still serve. Running `check` with `DJANGO_DEBUG=False`
+and no key raises `ImproperlyConfigured` instead of starting. Through the Vite proxy on a live dev
+server: `/`, `/properties`, `/api/health/` and `/api/docs/` all still 200.
+**Nothing was deployed, and Namecheap's own documentation could not be read from this machine** (both
+article URLs were blocked), so every hosting-account statement in `DEPLOYMENT.md` is marked **VERIFY**
+and its final table carries a NOT VERIFIED row for remote behaviour.
 
 The brochure wording pass was verified against the running dev server over HTTP: `/api/services/`
 returns the four published offers with their `icon` keys and slugs
@@ -495,17 +555,38 @@ temporary row plus its uploaded file were removed, so the table is the same five
 orders 1–5 with their original artwork. Console stayed clean apart from the two React Router
 future-flag warnings.
 
-The reminder work was verified against the **running dev server** over HTTP and read-only, because
-raising a reminder on live data writes a real `Message` into a real tenant's thread plus a
-`RentReminder` row: signing in as `admin@mantbridges.com` returned 200 and
-`GET /api/invoices/?overdue=true` returned **13 invoices in arrears** — the
-first page of 12 serialized a dialable `whatsapp_number` for every row (e.g.
-`'+256 700 815 336'` → `256700815336`), with **0 undialable rows on that page** —
-`GET /api/reminders/?invoice=…` returned `200 []` (no reminders raised, as expected), and
-`GET /api/reminders/` with no token returned 401. `normalise_msisdn()` was walked through its
-accepted and rejected shapes in a shell before the endpoints were built. The 10 reminder tests —
-including the refusal of a settled invoice, the tenant/landlord 403s, the idempotent `opened/` trace
-and the "no delivery vocabulary" guard — ran as part of the 101 above, on the test database.
+The reminder work was checked twice: read-only over HTTP, then in a real browser as the desk — and
+in the browser the dialog was opened and cancelled, never confirmed, because confirming writes a
+real `Message` into a real tenant's thread plus a `RentReminder` row.
+
+*Over HTTP:* signing in as `admin@mantbridges.com` returned 200 and
+`GET /api/invoices/?overdue=true` returned **13 invoices in arrears** — the first page of 12
+serialized a dialable `whatsapp_number` for every row (e.g. `'+256 700 815 336'` → `256700815336`),
+with **0 undialable rows on that page**. `GET /api/reminders/?invoice=…` returned `200 []` (none
+raised, as expected); the same list answered 401 with no token, and 403 for a landlord token and for
+a tenant token. `normalise_msisdn()` was walked through its accepted and rejected shapes in a shell
+before the endpoints were built.
+
+*In the browser* (`/manage/reminders`, dev server, signed in as Sarah Nakato): the four header
+figures come back as `13 · UGX 57,945,000 still owing · UGX 69,635,000 billed · UGX 11,690,000
+recovered`, the list defaults to "Due date: old first" and pages 12 + 1, and each row carries the
+tenant's phone, the invoice reference and period, days late, what is owing, how many times it was
+chased ("never chased", or `1 time · last 15 Oct 2026`) and a `+256700815336` chip. Pressing
+**Remind** opened the dialog naming `MB-INV-2026-00027`, Rhoda Kyomuhendo, Bugolobi Business Park
+Office Suite, UGX 6,765,000, due 07 Mar 2026, "229 days past the due date", addressed to
++256700815336 — then **Cancel**. The same dialog opens from `/manage/invoices/27` beside "Send a rent
+reminder", whose aside renders the Reminder log's empty state, and `GET /api/reminders/?invoice=27`
+still answered `count: 0` afterwards: the walk wrote nothing. Console stayed clean apart from the two
+React Router v7 future-flag warnings.
+
+**Still unverified on these screens:** the dialog's second step (the exact words, "Copy the words"
+and the `wa.me` address) and a populated Reminder log, because both need a reminder actually raised;
+and the "No usable number" row, because every tenant on this install has a dialable phone. Those
+three paths are covered by the 10 reminder tests — the refusal of a settled invoice, the
+tenant/landlord 403s, the idempotent `opened/` trace and the "no delivery vocabulary" guard — not by
+clicks. One behaviour worth knowing: "Amount: high to low" on the arrears list orders by the amount
+**billed**, not by what is owing, because `Invoice.balance` is computed and the API cannot order on
+it; the page therefore defaults to oldest due date first, which is the queue the desk works down.
 
 **Not verified:** the brochure wording and the new badge/arc motifs seen as a picture — the in-app
 browser in this session renders a 543×426 viewport and one full-page capture was refused
@@ -519,11 +600,7 @@ only the stacked mobile layout was screenshotted and measured); delivery of a re
 `EMAIL_BACKEND` here is the console backend, so no message has ever reached an inbox; the company
 logo upload (it would overwrite the real file); the three services screens seen as a picture at
 desktop width (the same viewport refusal, so they were read from the DOM and from computed styles);
-and any production deployment steps; the three reminder surfaces (`/manage/reminders`, the
-"Remind on WhatsApp" dialog on the invoice screen and the Reminder log in its aside) were **not
-clicked through in a browser** — the session's automation was refused permission to navigate, and
-deliberately not worked around, since a click there writes a real message into a real tenant's
-inbox. They are covered by tests and a clean build, not by a screenshot.
+and any production deployment steps.
 
 **Placeholder assets:** `frontend/public/images/{kampala,landlord,contracting}.jpg` are
 AI-generated stand-ins, not Mant Bridges photography. Replace them before launch.

@@ -1,0 +1,23 @@
+# Apache rules for the built React app. Vite copies this file out of public/ into dist/,
+# so it lands in the domain's document root with the rest of the bundle.
+#
+# Purpose: React Router owns paths like /properties/naalya-two-bedroom and /manage/invoices/27.
+# A refresh asks Apache for a file with that name, which does not exist, so without these
+# rules the visitor gets a 404 instead of the page.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Django's territory. If these fell through to index.html, every JSON call would come
+  # back as HTTP 200 containing the React page and the dashboard would fail confusingly.
+  # Drop whichever lines do not apply to this document root.
+  RewriteRule ^(api|django-admin|static|media)(/|$) - [L]
+
+  # Real files (assets/, favicon.svg, robots.txt) are served as themselves.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  RewriteRule ^ index.html [L]
+</IfModule>

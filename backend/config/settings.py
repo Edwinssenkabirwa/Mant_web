@@ -10,6 +10,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
@@ -23,9 +25,19 @@ def env_bool(name, default=False):
     return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-mant-bridges-dev-key")
+DEV_SECRET_KEY = "django-insecure-mant-bridges-dev-key"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+# Without this, a host that cannot read .env still boots — with the development key
+# and the debug pages switched on. Failing here is the loud version of the same mistake.
+if not DEBUG and (SECRET_KEY == DEV_SECRET_KEY or len(SECRET_KEY) < 50):
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be a long random value while DJANGO_DEBUG=False. "
+        "Generate one with: python -c \"from django.core.management.utils import "
+        "get_random_secret_key as k; print(k())\""
+    )
 
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -178,7 +190,23 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
 )
-CORS_ALLOW_CREDENTIALS = True
+# The SPA authorises with a Bearer token from localStorage, never with cookies, so
+# credentialed cross-origin requests are not part of any flow here.
+CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", False)
+
+# Needed only when the SPA is served from a different origin than the API and something
+# does send cookies. Explicit https:// origins, comma-separated.
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+
+# The host terminates SSL and proxies to Passenger, so requests arrive as http and Django
+# would build http:// media links. Set to "HTTP_X_FORWARDED_PROTO,on" (or
+# "HTTP_X_FORWARDED_SSL,on", whichever header the host actually forwards) only after
+# confirming it — trusting a header the front end does not set is worse than not setting it.
+_ssl_header = os.getenv("DJANGO_TRUSTED_SSL_HEADER", "").strip()
+SECURE_PROXY_SSL_HEADER = tuple(_ssl_header.split(",", 1)) if "," in _ssl_header else None
+
+# /api/schema/ and /api/docs/ publish every route, including the desk's and the landlords'.
+API_DOCS_ENABLED = env_bool("DJANGO_API_DOCS", DEBUG)
 
 # Uploaded images are validated by Pillow before saving.
 SILENCED_SYSTEM_CHECKS = []
@@ -223,3 +251,8 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Both stay off until the host's SSL termination is checked by hand: turning
+    # SECURE_SSL_REDIRECT on while the proxy still reports plain http traps the whole
+    # site in a redirect loop, and HSTS cannot be walked back once a browser has cached it.
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0"))

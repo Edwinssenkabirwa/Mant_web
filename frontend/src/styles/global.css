@@ -971,14 +971,15 @@ hr {
 }
 
 /* ---------- Hero -------------------------------------------------------- */
-/* The right-hand end of the gradient is the blue of the key in the logo, so the hero and the
-   search panel on it are the same family. The deep navy is kept where the white logo plate sits —
-   it is what holds the contrast of the tagline and the pale paragraph text. */
+/* Daylight, not dusk: the photograph is lifted with a filter and the scrim is thin enough to let it
+   read through. Navy stays only on the left, where the white logo plate and the pale copy need it —
+   the right-hand end finishes on the blue of the key in the logo, the same family as the search
+   panel sitting on it. */
 .hero {
   background:
-    radial-gradient(1100px 480px at 82% -10%, rgba(215, 38, 61, 0.35), transparent 60%),
-    radial-gradient(900px 460px at 10% 112%, rgba(1, 148, 242, 0.24), transparent 62%),
-    linear-gradient(135deg, var(--navy-900) 0%, var(--navy-800) 40%, var(--brand-blue-700) 100%);
+    radial-gradient(1100px 480px at 82% -10%, rgba(215, 38, 61, 0.26), transparent 60%),
+    radial-gradient(980px 520px at 12% 112%, rgba(1, 148, 242, 0.4), transparent 62%),
+    linear-gradient(135deg, var(--navy-800) 0%, var(--navy-600) 42%, var(--brand-blue-600) 100%);
   color: #fff;
   padding: 74px 0 84px;
   position: relative;
@@ -1025,8 +1026,8 @@ hr {
   max-width: 380px;
   padding: 9px 17px;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  background: rgba(6, 26, 51, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
   font-size: 0.93rem;
   font-weight: 700;
@@ -1134,9 +1135,9 @@ hr {
 .search-panel {
   background: linear-gradient(
     165deg,
-    rgba(6, 26, 51, 0.95) 0%,
-    rgba(11, 37, 69, 0.93) 48%,
-    rgba(0, 88, 178, 0.93) 100%
+    rgba(11, 37, 69, 0.9) 0%,
+    rgba(0, 77, 161, 0.9) 52%,
+    rgba(0, 99, 204, 0.92) 100%
   );
   border: 1px solid rgba(1, 148, 242, 0.34);
   border-top: 4px solid var(--brand-blue);
@@ -1207,6 +1208,7 @@ hr {
   object-fit: cover;
   object-position: center 62%;
   opacity: 0;
+  filter: brightness(1.24) saturate(1.06) contrast(1.02);
   transition: opacity 700ms ease;
 }
 
@@ -1216,13 +1218,14 @@ hr {
 
 .hero-scrim {
   background:
-    radial-gradient(900px 420px at 88% -10%, rgba(215, 38, 61, 0.26), transparent 62%),
+    radial-gradient(900px 420px at 88% -10%, rgba(215, 38, 61, 0.2), transparent 62%),
+    radial-gradient(820px 460px at 96% 108%, rgba(1, 148, 242, 0.34), transparent 66%),
     linear-gradient(
       100deg,
-      rgba(6, 26, 51, 0.95) 0%,
-      rgba(11, 37, 69, 0.88) 34%,
-      rgba(0, 77, 161, 0.66) 66%,
-      rgba(0, 99, 204, 0.44) 100%
+      rgba(6, 26, 51, 0.82) 0%,
+      rgba(19, 49, 92, 0.66) 36%,
+      rgba(0, 99, 168, 0.42) 68%,
+      rgba(1, 148, 242, 0.22) 100%
     );
 }
 
@@ -2704,8 +2707,8 @@ hr {
   .hero-photo { padding: 52px 0 60px; }
   .hero-scrim {
     background:
-      radial-gradient(600px 300px at 90% -8%, rgba(215, 38, 61, 0.22), transparent 62%),
-      linear-gradient(180deg, rgba(8, 28, 54, 0.96) 0%, rgba(11, 37, 69, 0.92) 56%, rgba(0, 74, 150, 0.86) 100%);
+      radial-gradient(600px 300px at 90% -8%, rgba(215, 38, 61, 0.18), transparent 62%),
+      linear-gradient(180deg, rgba(8, 28, 54, 0.86) 0%, rgba(19, 49, 92, 0.7) 56%, rgba(1, 110, 190, 0.48) 100%);
   }
   .hero-bg { object-position: center 40%; }
   .service-banner > .card-body { min-height: 0; padding: 22px; }
@@ -3090,7 +3093,7 @@ hr {
   align-self: flex-start;
   padding: 9px 14px;
   border-left: 3px solid var(--red-600);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
   font-size: 0.95rem;
   font-weight: 700;

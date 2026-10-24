@@ -363,11 +363,67 @@ the Reminder log on the invoice screen read from it. Statuses stop at `WRITTEN`,
 
 ---
 
+## 21. Shared-hosting readiness (2026-10-22 pass — what it fixed and what it deliberately left)
+
+`DEPLOYMENT.md` is the walk-through; this is the list of what still needs code.
+
+**Changed in this pass** (settings, deployment artifacts and documentation only — no model, no
+endpoint, no route removed, and `makemigrations --check` still reports no changes):
+
+- `DJANGO_SECRET_KEY` under `DJANGO_DEBUG=False` is now fatal if absent, short, or still the
+  development value.
+- `CORS_ALLOW_CREDENTIALS` defaults to `False`. The SPA authorises with a Bearer header from
+  `localStorage`, so credentialed cross-origin requests were enabled for a flow that does not exist.
+- `CSRF_TRUSTED_ORIGINS`, `DJANGO_TRUSTED_SSL_HEADER`, `DJANGO_API_DOCS`,
+  `DJANGO_SECURE_SSL_REDIRECT` and `DJANGO_SECURE_HSTS_SECONDS` are all read from the environment and
+  all default to the safe-for-development behaviour. SSL redirect and HSTS stay off in production on
+  purpose: the first loops the site behind a proxy that still reports plain http, the second is
+  cached by browsers for its whole duration and cannot be recalled.
+- `/api/schema/` and `/api/docs/` are registered only when `API_DOCS_ENABLED`, which follows `DEBUG`.
+  They publish every route the platform has, including the desk's and the landlords'.
+- New: `backend/passenger_wsgi.py` (the `application` callable Passenger looks for), pinned
+  `backend/requirements.txt`, `backend/apache.sample.htaccess`, `frontend/public/.htaccess` (SPA
+  fallback, copied into `dist/` by the build), an extended `backend/.env.example`.
+
+**Still open, in the order I would fix them:**
+
+1. **Item 19 — private documents in the media tree.** Re-confirmed live in this pass: an anonymous
+   `GET /media/receipts/…/MB-RCP-2026-00017.pdf` answers `200 application/pdf`, and the name is a
+   sequential receipt number. Property photographs must stay public and receipts cannot, and both sit
+   under one `MEDIA_ROOT`, so no web-server rule fixes this cleanly — the Apache deny snippet is a
+   stopgap that has to be proved with an anonymous curl on the actual host.
+2. **Item 13 — no throttle on `POST /api/auth/login/`.** Only the newsletter endpoints are limited.
+   This one matters more once the site is on public infrastructure.
+3. **Item 12 — `GET /api/company/` is public and carries the bank account and mobile-money numbers.**
+4. **Item 11 / the localStorage JWT problem.** `ROTATE_REFRESH_TOKENS` is on with
+   `BLACKLIST_AFTER_ROTATION=False` and no `token_blacklist` app, so signing out clears the browser
+   and leaves the tokens valid (access 12 h, refresh 14 days). Shared hosting cannot fix that; it is
+   an application change, and the docs say so rather than implying logout revokes anything.
+5. **`check --deploy` still prints 81 findings.** 79 are `drf_spectacular.W001/W002` — missing return
+   type hints on `SerializerMethodField`s and `APIView`s without a declared serializer, so the schema
+   guesses. Cosmetic, but they bury the two real warnings (`security.W004`, `security.W008`) every
+   time someone runs the command. Adding `@extend_schema_field` / `@extend_schema` would clear them.
+6. **Upload ceilings.** `FILE_UPLOAD_MAX_MEMORY_SIZE` is 15 MB on the Django side, but a shared host
+   caps POST size below that at the web server, and the cap is not known here. The first photograph
+   upload that fails with a bare 400 or an empty response is that limit, not a bug in the API.
+7. **Python floor.** `django-filter==26.2` needs 3.11+. A host offering only 3.10 cannot install the
+   pinned set — pin `django-filter<26` and re-run the suite rather than downgrading Django.
+8. **Whether Namecheap can run any of this at all is not confirmed.** Both knowledge-base articles
+   were blocked from this machine, so the plan's Python versions, cron availability and minimum
+   interval, docroot layout, Passenger log path, upload ceiling and whether `.htaccess` is honoured
+   inside a Passenger-routed directory are all still to be read off the account. `DEPLOYMENT.md`
+   marks each one **VERIFY**. Nothing has been deployed, so nothing here is tested remotely.
+
+---
+
 ### Also worth noting, without UI impact today
 
-- `DEBUG`, `SECRET_KEY` and SQLite all come from `.env`; production needs
-  `DJANGO_DEBUG=False`, a generated key, real `ALLOWED_HOSTS`, PostgreSQL, `collectstatic` and a
-  media backend (S3/OSS) since `MEDIA_ROOT` is local disk.
+- `DEBUG`, `SECRET_KEY` and the database engine all come from `.env`. A missing `.env` now stops
+  Django starting under `DJANGO_DEBUG=False` rather than booting on the published development key.
+  The shared-hosting target is **SQLite on local disk** (agreed 2026-10-22), not PostgreSQL and not
+  object storage — see `DEPLOYMENT.md` sections 11 and 13 for what that costs: one writer at a time,
+  the file must sit outside the document root, and the directory needs to be writable because SQLite
+  journals beside it. Revisit only if `database is locked` turns up in real use.
 - PII (`national_id`, `tin`, hashes never serialized, `password` write-only) is already excluded
   from public serializers; keep it that way if `/api/manage/tenants/` is added.
 - `Property.save()` and `sync_property_status()` flip AVAILABLE↔OCCUPIED from ACTIVE leases, so
