@@ -100,13 +100,24 @@ use the desk's cover switch on the listing if an owner's photograph should stay 
 
 ### `backend/.env`
 
+Uploads do not live in `backend/media/` any more. `STORAGES["default"]` is
+`apps.core.storage_backends.SupabasePublicMediaStorage` (bucket `mant-public-media`), and the receipt
+PDF and chat-attachment fields are bound to `SupabasePrivateFilesStorage` (bucket
+`mant-private-media`, signed GETs that expire after 300 seconds). The app therefore will not start at
+all without the two `SUPABASE_S3_*` keys, because those storage objects are built when the models are
+imported.
+
 | Variable | Purpose |
 | --- | --- |
 | `DJANGO_SECRET_KEY` | generate one, never commit it |
 | `DJANGO_DEBUG` | `True` locally only |
 | `DJANGO_ALLOWED_HOSTS` | comma-separated |
 | `DJANGO_TIME_ZONE` | defaults to `Africa/Kampala` |
-| `DB_ENGINE` | `sqlite` (default) or `postgresql`; then `DB_NAME/USER/PASSWORD/HOST/PORT` |
+| `DB_ENGINE` | `sqlite` (default) or `postgresql`; then `DB_NAME/USER/PASSWORD/HOST/PORT`. `DJANGO_DEBUG=False` requires `postgresql` |
+| `DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS` | `True` in the PostgreSQL branch, which is what Supabase's transaction pooler needs; set `False` only on a session pooler you have tested |
+| `DJANGO_DB_CONN_MAX_AGE` | `0` by default: one connection per request, for hosts that freeze between requests |
+| `SUPABASE_S3_ACCESS_KEY_ID`, `SUPABASE_S3_SECRET_ACCESS_KEY` | required; Supabase Storage's S3 credentials |
+| `SUPABASE_S3_REGION`, `SUPABASE_S3_ENDPOINT_URL` | default to `eu-west-1` and the project's `/storage/v1/s3` endpoint |
 | `CORS_ALLOWED_ORIGINS` | browser origins allowed to call the API directly |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` | console backend in development |
 | `PUBLIC_SITE_URL` | origin used for the links inside newsletter emails; must be the public site in production |
@@ -114,8 +125,13 @@ use the desk's cover switch on the listing if an owner's photograph should stay 
 | `NEWSLETTER_SUBSCRIBE_RATE`, `NEWSLETTER_TOKEN_RATE` | per-IP DRF rate limits on the public newsletter endpoints |
 | `LOG_LEVEL` | root logger level |
 
+Note on the two local env files: `settings.py` loads `backend/.env` and then `backend/.env.supabase`
+with `override=False`, so the first file wins wherever they both name a variable — which is why
+`DB_ENGINE=sqlite` in `.env` keeps this machine on SQLite. Both files are gitignored and neither is
+deployed; a hosted deployment gets its environment from the platform's project settings.
+
 Production switches, all of which default to the development behaviour and are documented in
-`DEPLOYMENT.md` section 4:
+`DEPLOYMENT.md` section 4 and `VERCEL_DEPLOYMENT.md` section 2:
 
 | Variable | Purpose |
 | --- | --- |
@@ -124,12 +140,15 @@ Production switches, all of which default to the development behaviour and are d
 | `DJANGO_TRUSTED_SSL_HEADER` | `header,value` (e.g. `HTTP_X_FORWARDED_PROTO,on`) so media and email links are built as `https` behind the host's SSL termination. Unset by default: trusting a header the front end does not set is a vulnerability, not a shortcut |
 | `DJANGO_API_DOCS` | serves `/api/schema/` and `/api/docs/`. Follows `DEBUG`, so production 404s them unless you ask — they list every route the platform has |
 | `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_SECURE_HSTS_SECONDS` | both off in production until HTTPS is proved by hand; the first loops the site behind a proxy that reports plain http, the second is cached by browsers and cannot be recalled |
+| `DJANGO_MAX_UPLOAD_MB` | ceiling for an upload and for the whole request body, 15 by default. Set `4` on Vercel, whose functions reject a body over 4.5 MB before Django sees it |
 
 `DJANGO_SECRET_KEY` is now fatal-if-wrong: with `DJANGO_DEBUG=False` and a missing, short or
 development key, Django raises `ImproperlyConfigured` at import instead of booting in a state you
-would not want public.
+would not want public. So is the database: production on `sqlite`, or on `postgresql` with any of
+`DB_NAME/USER/PASSWORD/HOST` blank, raises the same way rather than 500-ing per request.
 
-`.gitignore` already excludes `.env`, `db.sqlite3`, `media/`, `.venv/`, `node_modules/`, `dist/`.
+`.gitignore` already excludes `.env`, `.env.*` (except `.env.example`), `db.sqlite3`, `media/`,
+`.venv/`, `node_modules/`, `dist/`.
 
 ## Frontend
 
@@ -142,25 +161,29 @@ npm run preview        # serve dist/ on 4173
 ```
 
 In development Vite proxies `/api` and `/media` to `http://127.0.0.1:8000`, so the browser stays
-same-origin: no CORS preflight, no absolute media URLs, uploaded images resolve as-is.
+same-origin for JSON calls and no CORS preflight happens. Uploads themselves no longer come from that
+proxy: they are absolute Supabase object URLs.
 
 | Variable | Purpose |
 | --- | --- |
-| `VITE_BACKEND_URL` | move the dev proxy if Django runs elsewhere |
-| `VITE_MEDIA_BASE_URL` | prefix media with a CDN/object-store origin in production |
-| `VITE_API_BASE_URL` | API origin when the SPA is not served behind the same host |
+| `VITE_BACKEND_URL` | move the dev proxy if Django runs elsewhere — read from the shell by `vite.config.js`, not from a `.env` file |
+| `VITE_API_BASE_URL` | API origin when the SPA is not served behind the same host, e.g. `https://<api-host>/api` |
+| `VITE_MEDIA_BASE_URL` | only prefixes a *relative* `/media/...` path; unnecessary while Django hands out absolute bucket URLs |
 
 The last two are baked into the bundle at build time, so they belong in `frontend/.env.production`
-created *before* `npm run build` — and with the single-domain layout neither is needed, because
-`/api` and `/media` are already same-origin paths.
+created *before* `npm run build`, or in the host's project environment. Anything `VITE_`-prefixed is
+visible to every visitor — public configuration only. See `frontend/.env.example`.
 
-`public/.htaccess` ships inside `dist/` and is what makes a refresh on `/properties/<slug>` render
-the page instead of a 404; it excludes `/api`, `/media`, `/static` and `/django-admin` on purpose,
-because those falling through to `index.html` turns every JSON call into a 200 full of HTML.
+`public/.htaccess` ships inside `dist/` and is what makes a refresh on `/properties/<slug>` render the
+page instead of a 404 on Apache; it excludes `/api`, `/media`, `/static` and `/django-admin` on
+purpose, because those falling through to `index.html` turns every JSON call into a 200 full of HTML.
+On Vercel the same fallback comes from `frontend/vercel.json`, and the `.htaccess` file is inert.
 
-Media is portable by design: the API returns `request.build_absolute_uri()` paths, and
-`frontend/src/utils/media.js` reduces them to a pathname and re-prefixes only if
-`VITE_MEDIA_BASE_URL` is set. No component hardcodes `localhost:8000`.
+Media is portable by design: the API returns `request.build_absolute_uri()` addresses, and
+`frontend/src/utils/media.js` passes an absolute URL through untouched — which matters twice over now,
+because a signed receipt or attachment URL loses its authorisation the moment its query string is
+stripped. Only a path beginning with `/` is re-prefixed, and then only when `VITE_MEDIA_BASE_URL` is
+set. No component hardcodes `localhost:8000`.
 
 ### Demo logins (`seed_demo` default password `MantDemo@2026`)
 
@@ -188,6 +211,11 @@ python manage.py send_email_campaign --campaign 4 --passes 5 --delay 0.5
 `send_email_campaign` claims a queued campaign atomically, so a second run started while the first is
 still going reports that the campaign is held and does nothing. Re-running it resumes the same
 campaign where it stopped; each recipient gets at most 3 attempts before it is marked failed.
+
+Nothing schedules them on Vercel: a request-driven Function has no cron and stops existing between
+requests, and there is no HTTP endpoint that runs a command. That is documented as an open item in
+`VERCEL_DEPLOYMENT.md` section 8 rather than quietly dropped — the rent-reminder job in
+`apps/billing/reminders.py` is in the same class.
 
 ## API surface consumed by the frontend
 
@@ -417,6 +445,12 @@ record it prints, so it is scaled to 620 px and cached beside the upload as `mb_
 `mb_pdf_mark.jpg` in `MEDIA_ROOT/company/`. Those two files are derived, regenerable and safe to
 delete; they are rewritten whenever the logo changes.
 
+That cache assumes the logo is a file on this machine's disk. It is not any more — `Company.logo`
+resolves through Supabase Storage, so `_logo_path()` finds no `.path` and the invoice and receipt print
+the company name as text instead of the lockup, on any host without a writable persistent disk.
+Documents still generate and download; the branding is what degrades. Resizing in memory instead of to
+a sidecar file is the fix, recorded in `BACKEND_FOLLOWUPS.md`.
+
 A receipt with a long metadata block, a breakdown, payment details and a signature line runs to
 two pages — the signature block falls alone onto the second. That is the layout, not a bug: the
 letterhead repeats, and the alternative is a document that no longer reads like the paper the
@@ -451,17 +485,41 @@ office signs on.
 - The shared-hosting walk-through — cPanel Python app, `passenger_wsgi.py`, SQLite placement, the
   Apache rules that keep `/media/receipts` off the public web, cron lines for the three management
   commands, and what to do when it 500s — is `DEPLOYMENT.md`. Its final table marks every check
-  PASS, FAIL or NOT VERIFIED; nothing there has been run against a real host.
+  PASS, FAIL or NOT VERIFIED; nothing there has been run against a real host. It is now marked
+  superseded for hosting decisions, because uploads moved to Supabase Storage and the Vercel route was
+  prepared: `VERCEL_DEPLOYMENT.md` carries the environment-variable table, the two-project layout, the
+  serverless limitations (no scheduler, 4.5 MB request body, no writable disk) and its own
+  verified/not-verified split.
 
 ## Verification status
 
-`npm run build` → `✓ 2097 modules transformed`, `dist/assets/index-*.js` 634.24 kB (gzip 178.18 kB),
-`dist/assets/index-*.css` 46.39 kB, `✓ built in 6.0s`. `python manage.py check` → no issues;
-`python manage.py test apps.core` → **Ran 101 tests … OK** (114 s). The suite is still one module,
+`npm run build` → `✓ 2097 modules transformed`, `dist/assets/index-*.js` 634.22 kB (gzip 178.17 kB),
+`dist/assets/index-*.css` 46.39 kB, `✓ built in 5.1s`. `python manage.py check` → no issues;
+`python manage.py test apps` → **Ran 101 tests … OK** (102.7 s). The suite is still one module,
 `apps/core/tests.py`: services and seeding, newsletter double opt-in, the campaign engine, the admin
 email API, the landlord portal's access rules, 17 tests for the recommendation queue, and 10 tests
 for rent reminders. The campaign tests run on a throw-away database with Django's in-memory email
 backend — nothing in the suite can reach a real mailbox, and `db.sqlite3` is not touched by them.
+
+The Vercel pass (2026-10-24) ran that suite again after `apps/core/testing.py` was changed to isolate
+storage, because `MEDIA_ROOT` alone stopped being enough once `default` became an S3 backend: the same
+101 tests, **OK**, with the bucket contents counted on both sides of the run — `mant-public-media` 54
+objects before and 54 after, `mant-private-media` 22 before and 22 after, and no test-shaped key in
+either. `makemigrations --check` → *No changes detected*, which covers the two storage migrations. The
+new production guards were exercised with a throwaway 50-character key and a fake PostgreSQL config:
+`DJANGO_DEBUG=False` on SQLite, and `postgresql` with `DB_PASSWORD` forced empty, each raise
+`ImproperlyConfigured` at boot instead of serving traffic, and the complete fake config reports
+`CONN_MAX_AGE 0`, `CONN_HEALTH_CHECKS True`, `DISABLE_SERVER_SIDE_CURSORS True`,
+`SECURE_SSL_REDIRECT False`, `API_DOCS_ENABLED False`. `ASGI_APPLICATION` is gone, so Vercel's builder
+takes the WSGI entrypoint. On the frontend, `/api/properties/` and `/api/company/` were confirmed to
+return absolute `…supabase.co/storage/v1/object/public/mant-public-media/…` URLs, `src/utils/media.js`
+was fixed to stop stripping that origin (it was rewriting them to same-origin paths, which is why the
+listing page's images now resolve: 8 of 9 with `naturalWidth > 0`, 0 broken, 0 requested from the page's
+own origin), `vercel.json` carries Vercel's documented SPA rewrite, and the three credential values in
+`backend/.env.supabase` were compared by count against the pushed tree and every commit diff — 0
+matches, and neither `db.sqlite3` nor `backend/media/` was ever committed.
+**Nothing was deployed.** No Vercel project exists, so every claim about Vercel's own behaviour comes
+from its documentation and stays marked **VERIFY** in `VERCEL_DEPLOYMENT.md`.
 
 The shared-hosting pass (2026-10-22) was verified the same way, locally and against the running dev
 servers. `manage.py check --deploy` under `DJANGO_DEBUG=False` with a generated key: **81 findings,

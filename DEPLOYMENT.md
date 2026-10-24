@@ -1,5 +1,20 @@
 # Deploying Mant_web to Namecheap shared hosting (cPanel)
 
+> **Superseded for hosting decisions — kept for its audit.** Written on 2026-10-22, when the plan was
+> SQLite plus uploads on local disk, served by Passenger. Since then uploads moved to Supabase Storage
+> (`backend/apps/core/storage_backends.py`) and the Vercel route was prepared in
+> [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md). Read that file for anything about where the app runs.
+>
+> Three things here are now obsolete: the **SQLite** database decision (a Vercel deployment requires
+> `DB_ENGINE=postgresql`, and `settings.py` refuses to boot in production without it), the
+> **`backend/media/`** upload directory (public artwork and receipt PDFs are bucket objects now, so the
+> Apache `/media/` rule and the `<FilesMatch>` block protecting it no longer guard the real files), and
+> **Passenger** itself.
+>
+> Still accurate and worth using: sections on the settings guard, `check --deploy`, the JWT/`localStorage`
+> limitations, the login-throttle gap, and the environment-variable list — those describe the code, not
+> the host. Nothing has been removed.
+
 Written for this project as it stands on the local Windows machine, from the inspection done on
 2026-10-22. Every path, version and command below was read out of the repository or run locally;
 anything that depends on the hosting account is marked **VERIFY** and left as a placeholder.

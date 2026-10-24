@@ -428,3 +428,53 @@ endpoint, no route removed, and `makemigrations --check` still reports no change
   from public serializers; keep it that way if `/api/manage/tenants/` is added.
 - `Property.save()` and `sync_property_status()` flip AVAILABLE↔OCCUPIED from ACTIVE leases, so
   any new lease/tenant flow must not fight that automation.
+
+---
+
+## 22. Vercel deployment preparation (2026-10-24 pass)
+
+What this pass fixed, so the next person does not re-derive it:
+
+- **Test uploads no longer reach the live buckets.** `apps/core/testing.py` now overrides `STORAGES`
+  with a temporary `FileSystemStorage` *and* swaps the two fields bound to a bucket instance
+  (`Receipt.pdf`, `Message.attachment`), because a `STORAGES` override cannot reach a storage object
+  chosen at model-definition time. Proven by counting objects on both sides of the 101-test run:
+  54 public and 22 private before, the same after, no test-shaped key in either.
+- **Missing credentials now fail loudly and name themselves.** `validate_supabase_credentials()` raises
+  `ImproperlyConfigured` instead of a bare `RuntimeError`, `DJANGO_DEBUG=False` refuses SQLite and
+  refuses `postgresql` with any of `DB_NAME/USER/PASSWORD/HOST` blank.
+- **`ASGI_APPLICATION` removed**, because Vercel picks the ASGI entrypoint when both are set and this
+  app has only ever been exercised through WSGI.
+- **`mediaUrl()` stops rewriting absolute media URLs.** It used to reduce every address to a pathname
+  and re-prefix it — which silently broke every Supabase image and would have stripped the query string
+  from a signed receipt or attachment. Listing page verified in a browser: 8 of 9 images painted, 0
+  broken, 0 same-origin requests.
+- **The upload ceiling is configurable** (`DJANGO_MAX_UPLOAD_MB`, still 15 by default) so a Vercel
+  deployment can sit under the platform's 4.5 MB request-body limit and answer with its own error.
+
+Deliberately left open:
+
+1. **The data is still in SQLite and the app cannot boot on Vercel until that changes.**
+   `backend/.env` sets `DB_ENGINE=sqlite` and is loaded before `.env.supabase` with `override=False`, so
+   Supabase PostgreSQL has never held these rows. Deciding and running the move (dump/restore, or the
+   untracked `migrate_supabase_media.py` route) is the owner's call — it is the one item that blocks a
+   deployment, and nothing here tested it.
+2. **The letterhead logo cache wants a writable disk.** `documents.py` `_logo_path`/`_pdf_asset` read
+   `FieldFile.path` and write `mb_pdf_logo.jpg` beside the upload. On S3-backed storage the logo falls
+   back to the company name as text. Fix is an in-memory resize with `BytesIO`; the option was declined
+   for this pass, so the tests still pass by running against the isolated temporary filesystem.
+3. **No scheduler.** `generate_invoices`, `mark_overdue`, `send_email_campaign` and the rent reminders
+   need Vercel Cron plus a protected endpoint that runs a named command, or a persistent worker, or
+   Celery/Dramatiq. Building that endpoint means new permission work, so it was documented instead.
+4. **Uploads above 4.5 MB need presigned direct-to-bucket forms** — new API surface, planned separately.
+5. **No login rate limiting, no password-reset abuse protection, and a DRF throttle would be weaker on
+   serverless anyway** (per-process counters, short-lived processes). The real answer is at the edge.
+6. **Tokens in `localStorage` still cannot be revoked** — `BLACKLIST_AFTER_ROTATION=False` and
+   `token_blacklist` uninstalled. Unchanged, and a platform move does not change it.
+7. **Repo hygiene.** `a6d69c7` committed eight `*.before_*.bak` files, `requirements-temp.txt` and two
+   one-off media-migration scripts. No credential literal is in the tree or in any commit diff (checked
+   by count against `backend/.env.supabase`), but they belong in neither the bundle nor a review.
+   `storage_backends.py` also comments a bucket name that does not exist (`mant-private-files`).
+8. **Nothing has been deployed.** No Vercel project was created, so every platform-behaviour claim in
+   `VERCEL_DEPLOYMENT.md` is quoted from Vercel's documentation and marked **VERIFY** until the first
+   build log is read.

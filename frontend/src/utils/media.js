@@ -1,7 +1,9 @@
 /**
- * Media URLs come back from Django as absolute addresses pointing at the
- * backend host. Strip the origin so the path resolves through the Vite proxy in
- * development and through the same domain in production.
+ * Media URLs come back from Django absolute. Property artwork is a public Supabase
+ * address; a receipt or an attachment is a signed one, where the query string is the
+ * only thing authorising the download — stripping the origin would drop it. A relative
+ * /media path is what a locally served upload looks like, and that is the case that
+ * VITE_MEDIA_BASE_URL exists for.
  */
 const PLACEHOLDER =
   'data:image/svg+xml;charset=utf-8,' +
@@ -15,17 +17,13 @@ const PLACEHOLDER =
 
 export function mediaUrl(value, { fallback = PLACEHOLDER } = {}) {
   if (!value) return fallback;
-  if (value.startsWith('data:') || value.startsWith('blob:')) return value;
-
-  let path = value;
-  try {
-    path = new URL(value).pathname;
-  } catch {
-    if (!value.startsWith('/')) return fallback;
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value;
   }
+  if (!value.startsWith('/')) return fallback;
 
   const base = import.meta.env.VITE_MEDIA_BASE_URL;
-  return base ? `${base.replace(/\/$/, '')}${path}` : path;
+  return base ? `${base.replace(/\/$/, '')}${value}` : value;
 }
 
 export function companyLogo(company) {
