@@ -39,7 +39,7 @@ RUNNING_ON_VERCEL = bool(os.environ.get("VERCEL"))
 # the route map off an empty SQLite file, and looked like it had deployed. Now it stops at
 # boot and names what is missing instead.
 DEBUG = env_bool("DJANGO_DEBUG", not RUNNING_ON_VERCEL)
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = env_list("mant-web-33te.vercel.app","localhost,127.0.0.1")
 
 # Vercel names the current deployment in VERCEL_URL and the production alias in
 # VERCEL_PROJECT_PRODUCTION_URL. Both are written by the platform into the process
