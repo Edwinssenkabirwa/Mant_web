@@ -204,7 +204,10 @@ duration. `maxDuration` above 15 seconds is a Pro-plan capability — **VERIFY**
 3. Import it **twice**. Set Root Directory `frontend` on one project and `backend` on the other. Give
    them distinguishable names, e.g. `mant-bridges-web` and `mant-bridges-api`.
 4. Add the environment variables from section 2 to each project, for Production **and** Preview.
-5. Vercel deploys on every push to the default branch. Preview deployments get a per-commit domain, and
+5. Vercel deploys on every push to the default branch — **provided the project is Git-connected and its
+   Production Branch is `main`.** Check that first: Settings → Git. On 2026-10-24 a push to `main`
+   produced no build at all (see section 11), which is what a project created with `vercel --prod`, or
+   one watching a different branch, looks like. Preview deployments get a per-commit domain, and
    the API accepts its own Vercel hostname without being told (limitation 10). The frontend origin is a
    different project with a different domain, so `CORS_ALLOWED_ORIGINS` still needs each one that has to
    call the API — a preview frontend talking to the production API is exactly the case that 403s on a
@@ -365,12 +368,13 @@ Ordered by how much they will bite.
     environment, never copied from the request, so this cannot be talked into answering for someone
     else's domain, and no leading-dot `.vercel.app` entry is needed. Custom domains and any other
     origin still come from `DJANGO_ALLOWED_HOSTS`. Local runs are untouched: without `VERCEL` the list
-    stays `localhost,127.0.0.1`. The fix only takes effect once it is in the built commit.
+    stays `localhost,127.0.0.1`. The fix is on `origin/main` as `0af9af1`; it takes effect only in a
+    build, and no build has run yet (section 11).
     The same block of `settings.py` also stopped `DJANGO_DEBUG` defaulting to `True` on Vercel, which
     closes the more serious half of that first deployment: it was rendering Django's technical error
     pages and had `/api/docs/` switched on because nothing told it otherwise. Now a Vercel boot without
     the variables raises at import instead — see section 4.6.
-11. **Repo hygiene, now that it is in Git.** `a6d69c7` committed seven `*.before_storage.bak` files,
+11. **Repo hygiene, and the repository is public.** `a6d69c7` committed seven `*.before_storage.bak` files,
     `backend/config/settings.py.before_supabase_production.bak`, `backend/requirements-temp.txt`,
     `backend/migrate_supabase_media.py` and `backend/run_media_migration.py` alongside the real source.
     They contain no credential — verified against the values in `backend/.env.supabase` — but they are
@@ -380,6 +384,11 @@ Ordered by how much they will bite.
     and `test_supabase_connection.py` stayed ignored. `storage_backends.py` also carries a header
     comment naming a bucket (`mant-private-files`) that does not exist; the code uses
     `mant-private-media`.
+    Because `github.com/Edwinssenkabirwa/Mant_web` is public, `DEV_SECRET_KEY = "django-insecure-mant-…"`
+    in `settings.py` is readable by anyone, as is the whole history. That is fine for a development
+    default and disqualifying as a production one: anyone who has it can mint a JWT for any account on a
+    site that uses it. Generate a fresh `DJANGO_SECRET_KEY`, and consider making the repository private —
+    deleting the `.bak` files afterwards does not remove them from history.
 
 ## 9. Rollback and recovery
 
@@ -450,7 +459,9 @@ Ran on this machine, 2026-10-24:
 | `ALLOWED_HOSTS` and `DEBUG` on a simulated Vercel boot (`VERCEL=1`, `VERCEL_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `DJANGO_DEBUG=0`, throwaway 50-char key, fake PostgreSQL config) | `['localhost', '127.0.0.1', 'mant-web-33te.vercel.app', 'mant-web.vercel.app']`; `GET /api/health/` sent with that Host → **200** `{"status":"ok","service":"mant-bridges-api"}`; `GET /api/docs/` → **404** (`API_DOCS_ENABLED False`); `DEBUG False` |
 | Vercel boot with **nothing** typed into the dashboard (same emulation, no key, `DB_ENGINE=sqlite`) | refuses to import settings: `ImproperlyConfigured: DJANGO_SECRET_KEY must be a long random value while DJANGO_DEBUG=False …`; with a valid key and still no PostgreSQL config it goes one guard further: `DJANGO_DEBUG=False requires DB_ENGINE=postgresql with DB_NAME, DB_USER, DB_HOST and DB_PORT …` |
 | Local run, no `VERCEL` marker | unchanged: `DEBUG True`, `ALLOWED_HOSTS ['localhost', '127.0.0.1']` |
-| The repository's remote | `https://github.com/Edwinssenkabirwa/Mant_web`, `main` level with `origin/main` at `550d447`. Whether that repository is private or public was not checked and is **VERIFY** — every environment variable you add to Vercel stays out of it either way |
+| The repository's remote | `https://github.com/Edwinssenkabirwa/Mant_web` — **public**, confirmed anonymously against the GitHub API (`private: false`, `visibility: public`, default branch `main`). Every environment variable stays out of it either way, but see limitation 11: the eight `.bak` files and the development `DJANGO_SECRET_KEY` literal are readable by anyone |
+| `0af9af1` on `origin/main` and what Vercel did with it | the push landed (`pushed_at` moved, `git ls-remote` agrees), and the live URL still served the previous build 7 minutes later. The GitHub API reports **0 deployments and 0 check-runs** on `0af9af1` *and* on `550d447`, so no Vercel build was triggered by either push — the backend project is not Git-connected to this repository, or its Production Branch is not `main` |
+| What the live 400 page disclosed | the deployed `DATABASES` is `django.db.backends.sqlite3` at `/var/task/db.sqlite3` with `HOST ''` and `CONN_MAX_AGE 0` — so that project has **no** `DB_*` variables and `DEBUG` is on. `PASSWORD` came back masked (`'********************'`) and `SECRET_KEY` is absent from the page, so nothing credential-shaped was exposed; the page does disclose install paths and the app list, which is reason enough not to leave debug mode on a public URL |
 | `ASGI_APPLICATION` | no longer set; nothing imports channels, daphne or uvicorn |
 
 Not verified, and not claimed:

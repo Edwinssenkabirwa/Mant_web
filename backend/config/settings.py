@@ -19,27 +19,62 @@ load_dotenv(BASE_DIR / ".env.supabase", override=False)
 
 
 def env_list(name, default=""):
-    return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
+    # A variable present but blank reads as absent. An empty CORS or allowed-hosts list
+    # shuts everything out and reports nothing, which is a harder bug to find than a default.
+    value = os.getenv(name, "").strip() or default
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def env_bool(name, default=False):
     return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
+def env_origins(name, default=""):
+    """A comma-separated list of full origins, normalised and checked.
+
+    Django compares these literally against the browser's Origin header, so an entry
+    written without its scheme can never match anything. A rule that silently never
+    matches is worse than one that says what is wrong, so this names the entry and stops.
+    """
+    origins = []
+    for item in env_list(name, default):
+        origin = item.rstrip("/")
+        if not origin.startswith(("http://", "https://")):
+            raise ImproperlyConfigured(
+                f"{name} contains {item!r}, which is not an origin. Write it as "
+                "https://example.com: scheme required, no path, no trailing slash."
+            )
+        if origin not in origins:
+            origins.append(origin)
+    return origins
+
+
+def env_int(name, default):
+    """An integer that tolerates a variable being present but blank."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} is {raw!r}, which is not a whole number.")
+
+
 DEV_SECRET_KEY = "django-insecure-mant-bridges-dev-key"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
 
 # Vercel sets VERCEL in the process environment for every build and every request, so it is
-# a platform fact rather than something a caller can assert. It is used twice below: to
-# decide what DEBUG defaults to, and to decide whose hostnames are safe to trust.
+# a platform fact rather than something a caller can assert. It decides whose hostnames are
+# safe to trust, below.
 RUNNING_ON_VERCEL = bool(os.environ.get("VERCEL"))
 
-# Debug pages cannot exist on a request-driven host. A fresh image has no .env, so the old
-# default of True meant a half-configured deployment quietly served development pages and
-# the route map off an empty SQLite file, and looked like it had deployed. Now it stops at
-# boot and names what is missing instead.
-DEBUG = env_bool("DJANGO_DEBUG", not RUNNING_ON_VERCEL)
-ALLOWED_HOSTS = env_list("mant-web-33te.vercel.app","localhost,127.0.0.1")
+# Debug off unless a variable says otherwise: a fresh image has no .env, so the old default
+# of True meant a half-configured deployment quietly served development pages and the route
+# map off an empty SQLite file, and looked like it had deployed. Local development is
+# unchanged because backend/.env already carries DJANGO_DEBUG=True; a clone without that
+# file now stops at the guards below and names what it wants, instead of serving debug pages.
+DEBUG = env_bool("DJANGO_DEBUG", False)
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 # Vercel names the current deployment in VERCEL_URL and the production alias in
 # VERCEL_PROJECT_PRODUCTION_URL. Both are written by the platform into the process
@@ -208,7 +243,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # A Vercel function refuses any request body over 4.5 MB before Django sees it, so on that
 # host these are set to 4: the form then answers with its own message rather than the
 # platform dropping the upload with a status the app cannot explain.
-MAX_UPLOAD_MB = int(os.getenv("DJANGO_MAX_UPLOAD_MB", "15"))
+MAX_UPLOAD_MB = env_int("DJANGO_MAX_UPLOAD_MB", 15)
 FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_MB * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_MB * 1024 * 1024
 
@@ -252,16 +287,34 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
 }
 
-CORS_ALLOWED_ORIGINS = env_list(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
-)
+# The two projects Vercel now serves, plus the Vite dev server this repository has always
+# used. These are defaults, not secrets — every one of them is in a browser's address bar
+# somewhere — and they only apply when the variable is missing: setting CORS_ALLOWED_ORIGINS
+# or CSRF_TRUSTED_ORIGINS replaces the whole list, so repeat everything you still need there.
+DEV_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+FRONTEND_ORIGINS = "https://mant-web-suo1.vercel.app"
+API_ORIGINS = "https://mant-web-33te.vercel.app"
+
+# Which browser origins may call /api/. The React site is a separate Vercel project, so its
+# origin has to be listed here even though the API trusts its own hostname already.
+# PUBLIC_SITE_URL already names that site for the links inside e-mails, so it joins the
+# defaults too rather than being a second variable to remember and keep in step.
+_default_origins = [DEV_ORIGINS, FRONTEND_ORIGINS]
+_site_origin = os.getenv("PUBLIC_SITE_URL", "").strip().rstrip("/")
+if _site_origin.startswith(("http://", "https://")):
+    _default_origins.append(_site_origin)
+
+CORS_ALLOWED_ORIGINS = env_origins("CORS_ALLOWED_ORIGINS", ",".join(_default_origins))
 # The SPA authorises with a Bearer token from localStorage, never with cookies, so
 # credentialed cross-origin requests are not part of any flow here.
 CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", False)
 
-# Needed only when the SPA is served from a different origin than the API and something
-# does send cookies. Explicit https:// origins, comma-separated.
-CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+# Cookie-posting forms — /django-admin/ is the one that matters — check the Origin header
+# against ALLOWED_HOSTS or this list once the request arrives over https. The API's own
+# origin is here because the admin lives on it.
+CSRF_TRUSTED_ORIGINS = env_origins(
+    "CSRF_TRUSTED_ORIGINS", ",".join([*_default_origins, API_ORIGINS])
+)
 
 # The host terminates SSL and proxies to Passenger, so requests arrive as http and Django
 # would build http:// media links. Set to "HTTP_X_FORWARDED_PROTO,on" (or
@@ -280,7 +333,7 @@ EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_PORT = env_int("EMAIL_PORT", 587)
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
@@ -289,7 +342,7 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@mantbridges.com")
 # Base URL used for the links inside newsletter emails. In development this is the Vite
 # server; production must point it at the public site origin.
 PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "http://127.0.0.1:5173").rstrip("/")
-NEWSLETTER_CONFIRM_HOURS = int(os.getenv("NEWSLETTER_CONFIRM_HOURS", "72"))
+NEWSLETTER_CONFIRM_HOURS = env_int("NEWSLETTER_CONFIRM_HOURS", 72)
 
 LOGGING = {
     "version": 1,
@@ -320,4 +373,4 @@ if not DEBUG:
     # SECURE_SSL_REDIRECT on while the proxy still reports plain http traps the whole
     # site in a redirect loop, and HSTS cannot be walked back once a browser has cached it.
     SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
-    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0"))
+    SECURE_HSTS_SECONDS = env_int("DJANGO_SECURE_HSTS_SECONDS", 0)
