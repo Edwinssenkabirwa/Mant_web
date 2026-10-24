@@ -110,8 +110,8 @@ imported.
 | Variable | Purpose |
 | --- | --- |
 | `DJANGO_SECRET_KEY` | generate one, never commit it |
-| `DJANGO_DEBUG` | `True` locally only |
-| `DJANGO_ALLOWED_HOSTS` | comma-separated |
+| `DJANGO_DEBUG` | `True` locally only. Unset on Vercel it defaults to `False`, and the app then refuses to boot until the PostgreSQL variables are present |
+| `DJANGO_ALLOWED_HOSTS` | comma-separated, no scheme. On Vercel the platform's own `VERCEL_URL` / `VERCEL_PROJECT_PRODUCTION_URL` hosts are appended automatically; anything else you serve has to be listed here |
 | `DJANGO_TIME_ZONE` | defaults to `Africa/Kampala` |
 | `DB_ENGINE` | `sqlite` (default) or `postgresql`; then `DB_NAME/USER/PASSWORD/HOST/PORT`. `DJANGO_DEBUG=False` requires `postgresql` |
 | `DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS` | `True` in the PostgreSQL branch, which is what Supabase's transaction pooler needs; set `False` only on a session pooler you have tested |

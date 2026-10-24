@@ -451,14 +451,30 @@ What this pass fixed, so the next person does not re-derive it:
   broken, 0 same-origin requests.
 - **The upload ceiling is configurable** (`DJANGO_MAX_UPLOAD_MB`, still 15 by default) so a Vercel
   deployment can sit under the platform's 4.5 MB request-body limit and answer with its own error.
+- **The function trusts its own Vercel hostname.** The first live deployment answered every request with
+  `DisallowedHost` for `mant-web-33te.vercel.app`, because `ALLOWED_HOSTS` only ever had the local dev
+  list. `settings.py` now appends `VERCEL_URL` and `VERCEL_PROJECT_PRODUCTION_URL` when the `VERCEL`
+  marker is set — platform-written variables, not taken from the request — so previews answer their own
+  URL without a leading-dot `.vercel.app` entry. Verified by simulation: the two hosts appear in
+  `ALLOWED_HOSTS` and `GET /api/health/` returns 200; without `VERCEL` the list is unchanged.
+- **`DEBUG` no longer defaults to `True` on Vercel.** The same error page also proved the deployment was
+  running in debug mode with the API docs switched on, because `DJANGO_DEBUG` was unset and the `.env`
+  files never get deployed. `DEBUG = env_bool("DJANGO_DEBUG", not RUNNING_ON_VERCEL)` closes that: an
+  under-configured project now stops at import and names the missing variable, instead of quietly
+  serving development pages off an empty SQLite file. Four boot paths exercised locally (nothing set /
+  key only / full PostgreSQL config / no `VERCEL`); `/api/docs/` returns 404 on the Vercel emulation.
 
 Deliberately left open:
 
-1. **The data is still in SQLite and the app cannot boot on Vercel until that changes.**
+1. **The data is still in SQLite and the app cannot serve real data on Vercel until that changes.**
    `backend/.env` sets `DB_ENGINE=sqlite` and is loaded before `.env.supabase` with `override=False`, so
    Supabase PostgreSQL has never held these rows. Deciding and running the move (dump/restore, or the
    untracked `migrate_supabase_media.py` route) is the owner's call — it is the one item that blocks a
    deployment, and nothing here tested it.
+   Evidence from the first deployment points the same way: it rendered Django's *technical* 400 page,
+   which only exists when `DEBUG=True`. So that project booted with neither `DJANGO_DEBUG=False` nor the
+   `DB_*` values set — the `.env` files are not deployed, so defaults apply — and any query it did make
+   went to a fresh empty `db.sqlite3` inside the function image.
 2. **The letterhead logo cache wants a writable disk.** `documents.py` `_logo_path`/`_pdf_asset` read
    `FieldFile.path` and write `mb_pdf_logo.jpg` beside the upload. On S3-backed storage the logo falls
    back to the company name as text. Fix is an in-memory resize with `BytesIO`; the option was declined

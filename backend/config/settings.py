@@ -28,8 +28,30 @@ def env_bool(name, default=False):
 
 DEV_SECRET_KEY = "django-insecure-mant-bridges-dev-key"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
-DEBUG = env_bool("DJANGO_DEBUG", True)
+
+# Vercel sets VERCEL in the process environment for every build and every request, so it is
+# a platform fact rather than something a caller can assert. It is used twice below: to
+# decide what DEBUG defaults to, and to decide whose hostnames are safe to trust.
+RUNNING_ON_VERCEL = bool(os.environ.get("VERCEL"))
+
+# Debug pages cannot exist on a request-driven host. A fresh image has no .env, so the old
+# default of True meant a half-configured deployment quietly served development pages and
+# the route map off an empty SQLite file, and looked like it had deployed. Now it stops at
+# boot and names what is missing instead.
+DEBUG = env_bool("DJANGO_DEBUG", not RUNNING_ON_VERCEL)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+# Vercel names the current deployment in VERCEL_URL and the production alias in
+# VERCEL_PROJECT_PRODUCTION_URL. Both are written by the platform into the process
+# environment, never taken from the request, so trusting them cannot widen who gets an
+# answer — every preview would otherwise 400 with DisallowedHost until someone read the
+# new hostname off the log and typed it into the dashboard. Custom domains still belong in
+# DJANGO_ALLOWED_HOSTS, which is also where they are checked.
+if RUNNING_ON_VERCEL:
+    for _name in ("VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        _host = os.environ.get(_name, "").strip().lower().split(":")[0]
+        if _host and _host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(_host)
 
 # Without this, a host that cannot read .env still boots — with the development key
 # and the debug pages switched on. Failing here is the loud version of the same mistake.

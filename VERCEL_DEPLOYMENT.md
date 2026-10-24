@@ -81,9 +81,9 @@ These reach the function's `os.environ` at request time. They are never in the b
 
 | Variable | Value to set | Required | Notes |
 | --- | --- | --- | --- |
-| `DJANGO_DEBUG` | `False` | yes | The app refuses to start in production without the settings below |
+| `DJANGO_DEBUG` | `False` | yes | Vercel boots with it already off — leaving it unset no longer gives you debug pages, it refuses to start |
 | `DJANGO_SECRET_KEY` | a 50-character random string | yes | `python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"` |
-| `DJANGO_ALLOWED_HOSTS` | `<backend-project>.vercel.app,mantbridges.com,www.mantbridges.com` | yes | no scheme, no trailing slash; the function answers 400 for any other Host |
+| `DJANGO_ALLOWED_HOSTS` | `mantbridges.com,www.mantbridges.com` | for your own domains | no scheme, no trailing slash. Vercel's own `*.vercel.app` hosts are added automatically — see limitation 10 |
 | `DB_ENGINE` | `postgresql` | yes | `DJANGO_DEBUG=False` with anything else now raises `ImproperlyConfigured` at boot |
 | `DB_NAME` | Supabase database name, usually `postgres` | yes | |
 | `DB_USER` | Supabase database user, usually `postgres` | yes | |
@@ -204,10 +204,20 @@ duration. `maxDuration` above 15 seconds is a Pro-plan capability — **VERIFY**
 3. Import it **twice**. Set Root Directory `frontend` on one project and `backend` on the other. Give
    them distinguishable names, e.g. `mant-bridges-web` and `mant-bridges-api`.
 4. Add the environment variables from section 2 to each project, for Production **and** Preview.
-5. Vercel deploys on every push to the default branch. Preview deployments get a per-commit domain,
-   which is why `DJANGO_ALLOWED_HOSTS` and `CORS_ALLOWED_ORIGINS` need the production domains, and the
-   preview domain needs adding too if you want to test there (Django matches a leading dot, e.g.
-   `.vercel.app`, which admits every Vercel subdomain — accept that only while testing).
+5. Vercel deploys on every push to the default branch. Preview deployments get a per-commit domain, and
+   the API accepts its own Vercel hostname without being told (limitation 10). The frontend origin is a
+   different project with a different domain, so `CORS_ALLOWED_ORIGINS` still needs each one that has to
+   call the API — a preview frontend talking to the production API is exactly the case that 403s on a
+   preflight.
+6. **Expect a red build if the variables are not in the dashboard yet.** `DJANGO_DEBUG` now defaults to
+   `False` whenever `VERCEL` is set, and the fail-fast guards in `settings.py` raise at import — which
+   the build hits when it runs collectstatic. A backend project with no `DJANGO_SECRET_KEY` therefore
+   fails with `ImproperlyConfigured: DJANGO_SECRET_KEY must be a long random value while
+   DJANGO_DEBUG=False…`, and one with a key but no database fails with `DJANGO_DEBUG=False requires
+   DB_ENGINE=postgresql with DB_NAME, DB_USER, DB_HOST and DB_PORT…`. Both are the intended outcome:
+   a half-configured deployment used to boot quietly, serve development pages, and call an empty
+   throwaway SQLite file your database. Type the variables in, click *Redeploy*, and the message goes
+   away. All four boot paths were exercised locally (section 11).
 
 ## 5. Supabase PostgreSQL
 
@@ -347,10 +357,19 @@ Ordered by how much they will bite.
    machine.
 9. **The bundle is one Function.** Standard limit 500 MB; `backend/media/` and `staticfiles/` must not
    be pulled into it. `Large Functions` reach 5 GB in public beta if it ever matters.
-10. **`DJANGO_ALLOWED_HOSTS` and preview deployments.** Every preview gets a new hostname and Django
-    answers 400 to a Host it does not recognise. Testing on previews means adding that host or using a
-    leading-dot entry, which admits other people's Vercel subdomains. Prefer testing on the production
-    alias.
+10. **`*.vercel.app` hosts are trusted; anything else is yours to declare.** Every preview gets a new
+    hostname, and Django answers 400 with `DisallowedHost` to a Host it does not recognise — which is
+    what happened to the first deployment on `mant-web-33te.vercel.app`. `config/settings.py` now reads
+    `VERCEL_URL` and `VERCEL_PROJECT_PRODUCTION_URL` when the `VERCEL` platform marker is present and
+    appends both to `ALLOWED_HOSTS`. Those two variables are written by Vercel into the process
+    environment, never copied from the request, so this cannot be talked into answering for someone
+    else's domain, and no leading-dot `.vercel.app` entry is needed. Custom domains and any other
+    origin still come from `DJANGO_ALLOWED_HOSTS`. Local runs are untouched: without `VERCEL` the list
+    stays `localhost,127.0.0.1`. The fix only takes effect once it is in the built commit.
+    The same block of `settings.py` also stopped `DJANGO_DEBUG` defaulting to `True` on Vercel, which
+    closes the more serious half of that first deployment: it was rendering Django's technical error
+    pages and had `/api/docs/` switched on because nothing told it otherwise. Now a Vercel boot without
+    the variables raises at import instead — see section 4.6.
 11. **Repo hygiene, now that it is in Git.** `a6d69c7` committed seven `*.before_storage.bak` files,
     `backend/config/settings.py.before_supabase_production.bak`, `backend/requirements-temp.txt`,
     `backend/migrate_supabase_media.py` and `backend/run_media_migration.py` alongside the real source.
@@ -379,6 +398,9 @@ Ordered by how much they will bite.
   `settings.py` are deliberate and name the missing variable (`DJANGO_SECRET_KEY`, then
   `DB_ENGINE`/`DB_*`, then the Supabase storage keys). A crash loop that says
   `Missing Supabase Storage environment variables` is the storage keys, not the database.
+- If every path answers **400 `DisallowedHost`** — including `/api/health/`, before any routing happens
+  — the Host header is not in `ALLOWED_HOSTS`. A `*.vercel.app` host means the built commit predates the
+  `VERCEL_URL` block (limitation 10); any other host means `DJANGO_ALLOWED_HOSTS` needs it.
 - If images stop rendering after an environment change, check `VITE_API_BASE_URL` was rebuilt —
   it is read at build time, so a changed value with no rebuild keeps calling the old origin.
 - If private downloads start returning 403, the signed URL expired (300 seconds) or the S3 key/secret
@@ -389,11 +411,11 @@ Ordered by how much they will bite.
 
 1. Decide and execute the data move from `backend/db.sqlite3` into Supabase PostgreSQL — the reason
    the app cannot go live on Vercel today (section 8.1).
-2. Commit and push the remaining work from this pass. The settings guards, the test storage isolation,
-   `backend/.env.example` and `requirements.txt` are already in `a6d69c7` and on `origin/main`; still
-   uncommitted here are `frontend/vercel.json`, the `mediaUrl` fix in `frontend/src/utils/media.js`,
-   this file and the `README.md`, `DEPLOYMENT.md` and `BACKEND_FOLLOWUPS.md` updates. A deployment built
-   from GitHub today therefore has neither the SPA rewrite nor the image-URL fix.
+2. ~~Commit and push the remaining work from this pass.~~ Done on 2026-10-24, at your instruction: the
+   settings guards and test storage isolation are in `a6d69c7`, the SPA rewrite, the `mediaUrl` fix and
+   the first version of these guides are in `550d447`, and the `VERCEL_URL` host trust plus the
+   `DJANGO_DEBUG` fail-closed default went up in the commit after that, along with this file's updates.
+   Vercel rebuilt on that push — which is when section 4.6 stops being theory.
 3. Create the two Vercel projects and type the environment variables into the dashboard — secrets
    never go into this repository.
 4. Generate `DJANGO_SECRET_KEY`, and read the Supabase password and S3 keys out of Supabase itself.
@@ -412,7 +434,7 @@ Ran on this machine, 2026-10-24:
 
 | Check | Result |
 | --- | --- |
-| `python manage.py test apps` | **Ran 101 tests — OK**, twice: 102.7 s on the first state of the code, 104.8 s re-run after the `settings.py` guards were added |
+| `python manage.py test apps` | **Ran 101 tests — OK**, three times: 102.7 s, then 104.8 s after the `settings.py` guards, then 111.4 s after `DEBUG` stopped defaulting to `True` on Vercel |
 | Supabase bucket object count before / between / after those two runs | 54 public + 22 private every time; no test-shaped key in either bucket |
 | `python manage.py check` | System check identified no issues (0 silenced) |
 | `python manage.py makemigrations --check` | No changes detected |
@@ -425,14 +447,24 @@ Ran on this machine, 2026-10-24:
 | Git tracking of secrets | `backend/.env` and `backend/.env.supabase` match ignore rules and appear in no commit; `git ls-files` shows only `backend/.env.example`; `frontend/.env.local` matches the `.env.*` rule |
 | The three live credential values compared against the pushed tree and every commit diff | 0 files and 0 commits contain any of them — checked by count, never printed |
 | `backend/db.sqlite3` and `backend/media/` in Git | never committed: `git log --all` for both paths returns nothing, and `git ls-files` lists no media object |
-| The repository's remote | `https://github.com/Edwinssenkabirwa/Mant_web`, `main` level with `origin/main` at `a6d69c7`. Whether that repository is private or public was not checked and is **VERIFY** — every environment variable you add to Vercel stays out of it either way |
+| `ALLOWED_HOSTS` and `DEBUG` on a simulated Vercel boot (`VERCEL=1`, `VERCEL_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `DJANGO_DEBUG=0`, throwaway 50-char key, fake PostgreSQL config) | `['localhost', '127.0.0.1', 'mant-web-33te.vercel.app', 'mant-web.vercel.app']`; `GET /api/health/` sent with that Host → **200** `{"status":"ok","service":"mant-bridges-api"}`; `GET /api/docs/` → **404** (`API_DOCS_ENABLED False`); `DEBUG False` |
+| Vercel boot with **nothing** typed into the dashboard (same emulation, no key, `DB_ENGINE=sqlite`) | refuses to import settings: `ImproperlyConfigured: DJANGO_SECRET_KEY must be a long random value while DJANGO_DEBUG=False …`; with a valid key and still no PostgreSQL config it goes one guard further: `DJANGO_DEBUG=False requires DB_ENGINE=postgresql with DB_NAME, DB_USER, DB_HOST and DB_PORT …` |
+| Local run, no `VERCEL` marker | unchanged: `DEBUG True`, `ALLOWED_HOSTS ['localhost', '127.0.0.1']` |
+| The repository's remote | `https://github.com/Edwinssenkabirwa/Mant_web`, `main` level with `origin/main` at `550d447`. Whether that repository is private or public was not checked and is **VERIFY** — every environment variable you add to Vercel stays out of it either way |
 | `ASGI_APPLICATION` | no longer set; nothing imports channels, daphne or uvicorn |
 
 Not verified, and not claimed:
 
-- **Anything about Vercel's runtime.** No project was created, nothing was deployed, no function log
-  was read. Every statement about Vercel's behaviour comes from its documentation, cited above, and
-  each **VERIFY** item in sections 1, 3 and 7 is still open.
+- **Vercel's runtime, beyond what one failing deployment showed.** No project or deployment was created
+  from this machine. You created the first one yourself, and what came back was
+  `DisallowedHost at /` for `mant-web-33te.vercel.app` — a Django **technical** page, which is only
+  rendered when `DEBUG=True`, and from `/var/task/_vendor/django/…` on Python 3.12.14, which confirms the
+  bundle layout described in section 1. My own probes of that deployment returned 400 on `/`,
+  `/api/health/` and `/api/properties/` — the Host check rejects before routing, so nothing else about it
+  was observable. That single data point also means the backend project booted **without**
+  `DJANGO_DEBUG=False` or the `DB_*` values: the defaults applied, so it selected SQLite inside the
+  function image. Every other statement about Vercel's behaviour is quoted from its documentation, cited
+  below, and each **VERIFY** item in sections 1, 3 and 7 is still open.
 - The Namecheap/cPanel claims in `DEPLOYMENT.md` remain unverified — Namecheap's knowledge-base URLs
   were blocked from this machine when that guide was written.
 - Which of the two new buckets each existing object belongs to was counted, not inspected
