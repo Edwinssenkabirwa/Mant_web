@@ -1,5 +1,6 @@
 from decimal import Decimal
 from functools import partial
+from apps.core.storage_backends import SupabasePrivateFilesStorage
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -418,7 +419,12 @@ class Receipt(TimeStampedModel):
     paid_on = models.DateField()
     issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
                                   null=True, blank=True, related_name="receipts_issued")
-    pdf = models.FileField(upload_to="receipts/%Y/%m/", blank=True, null=True)
+    pdf = models.FileField(
+        upload_to="receipts/%Y/%m/",
+        storage=SupabasePrivateFilesStorage(),
+        blank=True,
+        null=True,
+    )
     notes = models.TextField(blank=True, default="")
     is_void = models.BooleanField(default=False)
     void_reason = models.CharField(max_length=255, blank=True, default="")

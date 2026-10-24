@@ -16,10 +16,11 @@ drf-spectacular==0.30.0
 Pillow==12.3.0
 reportlab==4.5.1
 python-dotenv==1.2.4
+psycopg[binary]==3.3.6
+django-storages[s3]==1.14.6
+boto3==1.43.118
 
 # Everything above has wheels for Linux, so no compiler is needed on a shared server.
-# There is deliberately no database driver: the application runs on SQLite, which ships
-# with Python. If this deployment ever moves to PostgreSQL or MySQL, add the driver here
-# and test it on the host before switching DB_ENGINE.
-# psycopg[binary]>=3.2,<4.0   # PostgreSQL only
-# PyMySQL>=1.1                 # MySQL/MariaDB only, if the plan offers it
+# psycopg[binary] bundles its own libpq; django-storages plus boto3 are what talk to
+# Supabase Storage. No MySQL driver is listed because DB_ENGINE only offers sqlite and
+# postgresql.

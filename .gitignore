@@ -4,6 +4,19 @@
 *.key
 *.pem
 
+# Secrets and environment configuration
+.env
+.env.*
+!.env.example
+
+# Local database and backups
+backend/db.sqlite3
+backend/db.sqlite3.backup
+
+# Temporary Supabase migration/testing files
+backend/supabase_migration_settings.py
+backend/test_supabase_connection.py
+
 # Python
 __pycache__/
 *.py[cod]
@@ -35,3 +48,12 @@ yarn-error.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local database exports and migration files
+backend/local_data_export.json
+backend/.env.supabase
+backend/supabase_migration_settings.py
+backend/test_supabase_connection.py
+backend/db.sqlite3
+backend/db.sqlite3.backup
+

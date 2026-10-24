@@ -15,6 +15,7 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env.supabase", override=False)
 
 
 def env_list(name, default=""):
@@ -98,7 +99,9 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"
+# ASGI_APPLICATION is deliberately not set. Nothing here installs channels, daphne or
+# uvicorn, and a host that finds both entrypoints switches to the ASGI one — the request
+# path this project has never been exercised on.
 
 DB_ENGINE = os.getenv("DB_ENGINE", "sqlite").strip().lower()
 
@@ -111,6 +114,17 @@ if DB_ENGINE == "postgresql":
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "5432"),
+            # A serverless function is frozen between requests and its connections with it,
+            # so each request opens its own. Raise this only on a host with a real process
+            # lifetime, and only against a session-mode pooler.
+            "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "0")),
+            "CONN_HEALTH_CHECKS": True,
+            # Supabase's pooler defaults to transaction mode, which discards the session
+            # state a server-side cursor lives on. Queries then fail part-way through a
+            # page rather than at connect, so the safe default is to not use them.
+            "DISABLE_SERVER_SIDE_CURSORS": env_bool(
+                "DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS", True
+            ),
         }
     }
 else:
@@ -120,6 +134,22 @@ else:
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+
+if not DEBUG and DB_ENGINE != "postgresql":
+    raise ImproperlyConfigured(
+        "DJANGO_DEBUG=False requires DB_ENGINE=postgresql with DB_NAME, DB_USER, DB_HOST "
+        "and DB_PORT. SQLite is a file in the deploy directory: a request-driven host "
+        "starts from a fresh image, so the database would be empty on every cold start."
+    )
+
+if not DEBUG and DB_ENGINE == "postgresql":
+    gaps = [name for name in ("DB_NAME", "DB_USER", "DB_HOST", "DB_PASSWORD")
+            if not os.getenv(name, "").strip()]
+    if gaps:
+        raise ImproperlyConfigured(
+            "PostgreSQL is selected but " + ", ".join(gaps) + " is empty. Every request "
+            "would fail on the first query, so this stops here instead of at the database."
+        )
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -142,10 +172,23 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+STORAGES = {
+    "default": {
+        "BACKEND": "apps.core.storage_backends.SupabasePublicMediaStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-FILE_UPLOAD_MAX_MEMORY_SIZE = 15 * 1024 * 1024
-DATA_UPLOAD_MAX_MEMORY_SIZE = 15 * 1024 * 1024
+# A Vercel function refuses any request body over 4.5 MB before Django sees it, so on that
+# host these are set to 4: the form then answers with its own message rather than the
+# platform dropping the upload with a status the app cannot explain.
+MAX_UPLOAD_MB = int(os.getenv("DJANGO_MAX_UPLOAD_MB", "15"))
+FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_MB * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_MB * 1024 * 1024
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

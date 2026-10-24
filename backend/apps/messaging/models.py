@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import models
-
+from apps.core.storage_backends import SupabasePrivateFilesStorage
 from apps.core.models import TimeStampedModel
 
 
@@ -66,7 +66,12 @@ class Message(TimeStampedModel):
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                                related_name="messages_sent")
     body = models.TextField()
-    attachment = models.FileField(upload_to="messages/%Y/%m/", blank=True, null=True)
+    attachment = models.FileField(
+        upload_to="messages/%Y/%m/",
+        storage=SupabasePrivateFilesStorage(),
+        blank=True,
+        null=True,
+    )
     read_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="messages_read",
                                      blank=True)
 
